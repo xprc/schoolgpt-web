@@ -1,7 +1,7 @@
 {
   "name": "schoolgpt",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "katex": "^0.16.47",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "react-markdown": "^10.1.0",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
