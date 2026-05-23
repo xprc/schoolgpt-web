@@ -6,8 +6,12 @@
   "startConversation": "Start a new conversation",
   "thinking": "Thinking deeply...",
   "generating": "Generating response...",
-  "auto": "Auto",
-  "thinkingMode": "Thinking",
+  "chatMode": "Chat mode",
+  "chatModes": {
+    "auto": "Auto",
+    "quick": "Fast",
+    "thinking": "Thinking"
+  },
   "placeholder": "What's in your mind?...",
   "enterToSend": " (Enter to send)",
   "regenerate": "Regenerate",

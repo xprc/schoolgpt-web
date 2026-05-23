@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from 'react-i18next';
 import {
+    Add01Icon,
     ArrowDown01Icon,
-    Attachment01Icon,
+    ArrowUp01Icon,
     Chat01Icon,
     Copy01Icon,
     Edit01Icon,
@@ -11,13 +12,13 @@ import {
     MicOff01Icon,
     MoreVerticalIcon,
     Refresh01Icon,
-    SentIcon,
     ThumbsDownIcon,
     ThumbsUpIcon,
     VolumeMute01Icon,
     VolumeUpIcon
 } from 'hugeicons-react';
 import CodeBlock from './CodeBlock';
+import { streamChat } from '../utils/apiChat';
 import type { Message } from '../utils/types';
 
 type MainChatProps = {
@@ -67,6 +68,10 @@ type SpeechRecognitionWindow = Window & {
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
 };
 
+type ChatMode = 'auto' | 'quick' | 'thinking';
+
+const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
+
 let messageIdCounter = 0;
 
 const createMessageId = (prefix: string) => {
@@ -77,7 +82,7 @@ const createMessageId = (prefix: string) => {
 export default function MainChat({ messages, setMessages }: MainChatProps) {
     const { t, i18n } = useTranslation();
     const [input, setInput] = useState('');
-    const [mode, setMode] = useState<'auto' | 'thinking'>('auto');
+    const [mode, setMode] = useState<ChatMode>('auto');
     const [isLoading, setIsLoading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -120,16 +125,15 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                 }
             };
             recognitionRef.current.onend = () => setIsRecording(false);
-            recognitionRef.current.onerror = (event) => {
-                console.error('Speech recognition error:', event);
+            recognitionRef.current.onerror = () => {
                 setIsRecording(false);
             };
 
             try {
                 recognitionRef.current.start();
                 setIsRecording(true);
-            } catch (e) {
-                console.error(e);
+            } catch {
+                setIsRecording(false);
             }
         }
     };
@@ -193,118 +197,17 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
         const newAiMsg: Message = { id: responseId, role: 'ai', content: '' };
         setMessages([...currentMessages, newAiMsg]);
 
-        const url = 'http://127.0.0.1:8000/api/chat';
-        const payload = { query: query };
-        const myToken = 'my-super-secret-token';
-
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: 'Bearer ' + myToken
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    throw new Error('鉴权失败：Token 无效');
-                } else {
-                    throw new Error('网络请求失败');
-                }
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('No readable stream');
-
-            const decoder = new TextDecoder('utf-8');
-            let done = false;
             let aiContent = '';
-            let buffer = '';
 
-            while (!done) {
-                const { value, done: readerDone } = await reader.read();
-                done = readerDone;
-
-                if (value) {
-                    buffer += decoder.decode(value, { stream: true });
-                    let eventEndIndex;
-                    while ((eventEndIndex = buffer.indexOf('\n\n')) >= 0) {
-                        const event = buffer.slice(0, eventEndIndex);
-                        buffer = buffer.slice(eventEndIndex + 2);
-
-                        if (event.trim() === 'data: [DONE]') continue;
-
-                        let dataText = '';
-                        let hasData = false;
-                        const lines = event.split('\n');
-
-                        for (let i = 0; i < lines.length; i++) {
-                            const line = lines[i];
-                            if (line.startsWith('data:')) {
-                                hasData = true;
-                                let rawData = line.substring(5);
-                                if (rawData.startsWith(' ')) rawData = rawData.substring(1);
-                                dataText += (dataText.length > 0 ? '\n' : '') + rawData;
-                            } else if (hasData && line !== '') {
-                                dataText += '\n' + line;
-                            }
-                        }
-
-                        if (hasData) {
-                            let parsedText = dataText;
-                            if (dataText === '') {
-                                parsedText = '\n';
-                            } else {
-                                try {
-                                    const dataObj = JSON.parse(dataText);
-                                    if (typeof dataObj === 'string') {
-                                        parsedText = dataObj;
-                                    } else if (
-                                        typeof dataObj === 'number' ||
-                                        typeof dataObj === 'boolean'
-                                    ) {
-                                        parsedText = String(dataObj);
-                                    } else if (dataObj !== null && typeof dataObj === 'object') {
-                                        if (dataObj.content !== undefined) {
-                                            parsedText = dataObj.content;
-                                        } else if (
-                                            dataObj.choices?.[0]?.delta?.content !== undefined
-                                        ) {
-                                            parsedText = dataObj.choices[0].delta.content;
-                                        } else if (dataObj.response !== undefined) {
-                                            parsedText = dataObj.response;
-                                        } else if (dataObj.message?.content !== undefined) {
-                                            parsedText = dataObj.message.content;
-                                        } else if (dataObj.answer !== undefined) {
-                                            parsedText = dataObj.answer;
-                                        } else {
-                                            parsedText = '';
-                                        }
-                                    } else {
-                                        parsedText = '';
-                                    }
-                                } catch {
-                                    parsedText = dataText.replace(/\\n/g, '\n');
-                                }
-                            }
-
-                            if (parsedText) {
-                                aiContent += parsedText;
-                                setMessages((prev) =>
-                                    prev.map((m) =>
-                                        m.id === responseId ? { ...m, content: aiContent } : m
-                                    )
-                                );
-                            }
-                        }
-                    }
-                }
-            }
+            await streamChat(query, (parsedText) => {
+                aiContent += parsedText;
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === responseId ? { ...m, content: aiContent } : m))
+                );
+            });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('请求发生错误: ', error);
             setMessages((prev) =>
                 prev.map((m) =>
                     m.id === responseId
@@ -354,8 +257,9 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
     };
 
     return (
-        <div className="flex-1 flex flex-col min-w-0 h-full bg-white dark:bg-[#1a1a1a] overflow-hidden transition-colors duration-200">
-            <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-8 custom-scrollbar relative">
+        <div className="flex-1 min-w-0 h-full bg-transparent overflow-y-auto custom-scrollbar transition-colors duration-200">
+            <div className="min-h-full flex flex-col">
+            <div className="flex-1 px-4 sm:px-8 pt-24 sm:pt-24 pb-6 sm:pb-8 relative bg-transparent">
                 <div className="max-w-4xl mx-auto space-y-8 sm:space-y-10">
                     {messages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 mt-20">
@@ -366,10 +270,10 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                         messages.map((msg, index) => (
                             <div key={msg.id}>
                                 {msg.role === 'user' ? (
-                                    <div className="flex justify-end mb-6">
-                                        <div className="max-w-[85%] sm:max-w-[75%] group">
+                                    <div className="flex justify-end mb-6 min-w-0">
+                                        <div className="max-w-[85%] sm:max-w-[75%] min-w-0 group">
                                             {editingId === msg.id ? (
-                                                <div className="bg-[#f0f4f9] dark:bg-[#2a2a2a] rounded-3xl p-4 shadow-sm">
+                                                <div className="bg-white/60 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-3xl p-4 shadow-lg shadow-black/5 dark:shadow-black/25">
                                                     <textarea
                                                         value={editContent}
                                                         onChange={(e) => setEditContent(e.target.value)}
@@ -379,7 +283,7 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                                                     <div className="flex justify-end gap-2 mt-2">
                                                         <button
                                                             onClick={cancelEdit}
-                                                            className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                                                            className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-full transition-colors"
                                                         >
                                                             {t('cancel')}
                                                         </button>
@@ -392,22 +296,19 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="relative">
-                                                    <div className="bg-[#f0f4f9] dark:bg-[#2a2a2a] rounded-3xl rounded-tr-sm px-5 py-3.5 shadow-sm relative group-hover:shadow-md transition-shadow">
-                                                        <p className="text-[15px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                                <div className="bg-white/60 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-3xl px-5 pt-3.5 pb-2.5 shadow-lg shadow-black/5 dark:shadow-black/25 relative overflow-hidden transition-all group-hover:bg-white/70 dark:group-hover:bg-white/[0.11] group-hover:shadow-xl">
+                                                    <div className="relative">
+                                                        <p className="text-[15px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
                                                             {msg.content}
                                                         </p>
-                                                        <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <ArrowDown01Icon size={16} />
-                                                        </button>
                                                     </div>
-                                                    <div className="flex items-center justify-end gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+                                                    <div className="flex items-center justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button
                                                             onClick={() => toggleSpeak(msg.id, msg.content)}
-                                                            className={`p-1.5 rounded-full transition-colors ${
+                                                            className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
                                                                 speakingId === msg.id
-                                                                    ? 'text-[#5b6ef5] bg-blue-50 dark:bg-blue-900/30'
-                                                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                                    ? 'text-[#5b6ef5] bg-white/60 dark:bg-white/10'
+                                                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10'
                                                             }`}
                                                             title="Speak"
                                                         >
@@ -419,17 +320,20 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                                                         </button>
                                                         <button
                                                             onClick={() => copyText(msg.content)}
-                                                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                                                            className="flex h-8 w-8 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
                                                             title="Copy"
                                                         >
                                                             <Copy01Icon size={14} />
                                                         </button>
                                                         <button
                                                             onClick={() => handleEdit(msg.id, msg.content)}
-                                                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                                                            className="flex h-8 w-8 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
                                                             title="Edit"
                                                         >
                                                             <Edit01Icon size={14} />
+                                                        </button>
+                                                        <button className="flex h-8 w-8 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
+                                                            <ArrowDown01Icon size={14} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -437,32 +341,31 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex gap-3 sm:gap-4 pl-2 sm:pl-12">
-                                        <div className="flex-1 space-y-3">
-                                            <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
-                                                CHAT A.I + <ArrowDown01Icon size={14} />
-                                            </div>
-                                            <div className="text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert">
-                                                <ReactMarkdown components={{ code: CodeBlock }}>
-                                                    {msg.content}
-                                                </ReactMarkdown>
-                                            </div>
-
-                                            <div className="flex items-center justify-between pt-4">
-                                                <div className="flex items-center gap-1">
-                                                    <button className="p-2 text-[#5b6ef5] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
+                                    <div className="flex gap-3 sm:gap-4 min-w-0">
+                                        <div className="flex-1 min-w-0 space-y-3">
+                                            <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 pt-4 pb-2.5 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3 overflow-hidden">
+                                                <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
+                                                    校园百事通 <ArrowDown01Icon size={14} />
+                                                </div>
+                                                <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
+                                                    <ReactMarkdown components={{ code: CodeBlock }}>
+                                                        {msg.content}
+                                                    </ReactMarkdown>
+                                                </div>
+                                                <div className="flex items-center gap-1 pt-1">
+                                                    <button className="flex h-8 w-8 items-center justify-center text-[#5b6ef5] dark:text-blue-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                                                         <ThumbsUpIcon size={16} />
                                                     </button>
-                                                    <button className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                                    <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                                                         <ThumbsDownIcon size={16} />
                                                     </button>
-                                                    <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+                                                    <div className="w-px h-4 bg-white/50 dark:bg-white/10 mx-1"></div>
                                                     <button
                                                         onClick={() => toggleSpeak(msg.id, msg.content)}
-                                                        className={`p-2 rounded-lg transition-colors ${
+                                                        className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
                                                             speakingId === msg.id
-                                                                ? 'text-[#5b6ef5] bg-blue-50 dark:bg-blue-900/30'
-                                                                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                                ? 'text-[#5b6ef5] bg-white/60 dark:bg-white/10'
+                                                                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10'
                                                         }`}
                                                         title="Speak"
                                                     >
@@ -474,28 +377,25 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                                                     </button>
                                                     <button
                                                         onClick={() => copyText(msg.content)}
-                                                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                                        className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
                                                         title="Copy"
                                                     >
                                                         <Copy01Icon size={16} />
                                                     </button>
-                                                    <button className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                                    <button
+                                                        onClick={() => handleRegenerate(index)}
+                                                        className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
+                                                        title={t('regenerate')}
+                                                    >
+                                                        <Refresh01Icon size={16} />
+                                                    </button>
+                                                    <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                                                         <MoreVerticalIcon size={16} />
                                                     </button>
                                                 </div>
-                                                <button
-                                                    onClick={() => handleRegenerate(index)}
-                                                    className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm transition-colors"
-                                                >
-                                                    <Refresh01Icon size={14} />
-                                                    {t('regenerate')}
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                                {index < messages.length - 1 && (
-                                    <div className="h-px bg-gray-100 dark:bg-gray-800 w-full my-6 sm:my-8"></div>
                                 )}
                             </div>
                         ))
@@ -503,17 +403,16 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
 
                     {isLoading && (
                         <>
-                            {messages.length > 0 && (
-                                <div className="h-px bg-gray-100 dark:bg-gray-800 w-full my-6 sm:my-8"></div>
-                            )}
                             <div className="flex gap-3 sm:gap-4 pl-2 sm:pl-12">
                                 <div className="flex-1 space-y-3">
-                                    <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
-                                        CHAT A.I + <ArrowDown01Icon size={14} />
-                                    </div>
-                                    <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
-                                        <Refresh01Icon size={14} className="animate-spin" />
-                                        {mode === 'thinking' ? t('thinking') : t('generating')}
+                                    <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 py-4 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3">
+                                        <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
+                                            CHAT A.I + <ArrowDown01Icon size={14} />
+                                        </div>
+                                        <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
+                                            <Refresh01Icon size={14} className="animate-spin" />
+                                            {mode === 'thinking' ? t('thinking') : t('generating')}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -523,65 +422,73 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                 </div>
             </div>
 
-            <div className="p-2 sm:p-3 pl-2 sm:pl-4 flex items-center gap-2 sm:gap-3 shrink-0 border-t border-gray-200/60 dark:border-gray-800/60">
-                <label className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 flex items-center justify-center shrink-0 cursor-pointer transition-colors">
-                    <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                                console.log('File selected:', e.target.files[0].name);
+            <div className="sticky bottom-0 shrink-0 px-3 sm:px-6 pb-3 sm:pb-5 pt-2 bg-transparent">
+                <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 dark:border-white/10 bg-white/78 dark:bg-[#10131b]/82 backdrop-blur-2xl backdrop-saturate-150 px-4 py-3 shadow-[0_18px_45px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_45px_rgba(0,0,0,0.42)] transition-colors">
+                    <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                if (e.shiftKey) return;
+                                e.preventDefault();
+                                handleSend();
                             }
                         }}
+                        placeholder={t('placeholder')}
+                        rows={1}
+                        className="block min-h-[42px] w-full resize-none bg-transparent px-1 pb-1 pt-0 text-[15px] leading-6 text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-500"
                     />
-                    <Attachment01Icon size={18} className="text-gray-600 dark:text-gray-300" />
-                </label>
-                <button
-                    onClick={toggleRecording}
-                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                        isRecording
-                            ? 'bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
-                            : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}
-                >
-                    {isRecording ? <MicOff01Icon size={18} /> : <Mic01Icon size={18} />}
-                </button>
-                <select
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value as 'auto' | 'thinking')}
-                    className="hidden sm:block bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800/60 text-sm text-gray-700 dark:text-gray-200 rounded-xl px-3 py-2 outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-[#222] transition-colors appearance-none pr-8 relative font-medium"
-                    style={{
-                        backgroundImage:
-                            'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'right .7rem top 50%',
-                        backgroundSize: '.65rem auto'
-                    }}
-                >
-                    <option value="auto">{t('auto')}</option>
-                    <option value="thinking">{t('thinkingMode')}</option>
-                </select>
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            if (e.shiftKey) return;
-                            e.preventDefault();
-                            handleSend();
-                        }
-                    }}
-                    placeholder={`${t('placeholder')}${t('enterToSend')}`}
-                    className="flex-1 bg-transparent outline-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 text-[14px] sm:text-[15px] px-2"
-                />
-                <button
-                    onClick={handleSend}
-                    disabled={isLoading || !input.trim()}
-                    className="w-10 h-10 sm:w-12 sm:h-12 bg-[#5b6ef5] hover:bg-[#4a5ce0] disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform hover:scale-105 shadow-sm"
-                >
-                    <SentIcon size={18} className="ml-0.5" />
-                </button>
+                    <div className="flex items-center gap-2">
+                        <label className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100 shrink-0 cursor-pointer">
+                            <input
+                                type="file"
+                                className="hidden"
+                            />
+                            <Add01Icon size={20} />
+                        </label>
+                        <div className="flex-1"></div>
+                        <div
+                            className="flex shrink-0 items-center rounded-full border border-white/60 bg-white/45 p-1 shadow-inner shadow-white/40 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06] dark:shadow-black/20"
+                            role="radiogroup"
+                            aria-label={t('chatMode')}
+                        >
+                            {chatModes.map((chatMode) => (
+                                <button
+                                    key={chatMode}
+                                    type="button"
+                                    onClick={() => setMode(chatMode)}
+                                    className={`h-8 min-w-11 rounded-full px-3 text-sm font-medium transition-all ${
+                                        mode === chatMode
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-white/15 dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                                    }`}
+                                    role="radio"
+                                    aria-checked={mode === chatMode}
+                                >
+                                    {t(`chatModes.${chatMode}`)}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={toggleRecording}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors shrink-0 ${
+                                isRecording
+                                    ? 'bg-red-100/80 text-red-500 dark:bg-red-900/35 dark:text-red-300 animate-pulse'
+                                    : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100'
+                            }`}
+                        >
+                            {isRecording ? <MicOff01Icon size={18} /> : <Mic01Icon size={18} />}
+                        </button>
+                        <button
+                            onClick={handleSend}
+                            disabled={isLoading || !input.trim()}
+                            className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-600 text-white shadow-sm transition-all hover:bg-gray-700 hover:scale-105 disabled:bg-gray-300 disabled:text-white disabled:cursor-not-allowed disabled:hover:scale-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:disabled:bg-white/20 dark:disabled:text-white/50 shrink-0"
+                        >
+                            <ArrowUp01Icon size={20} />
+                        </button>
+                    </div>
+                </div>
+            </div>
             </div>
         </div>
     );

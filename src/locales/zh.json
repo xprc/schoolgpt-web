@@ -6,8 +6,12 @@
   "startConversation": "开始新对话",
   "thinking": "深度思考中...",
   "generating": "生成回复中...",
-  "auto": "自动",
-  "thinkingMode": "思考",
+  "chatMode": "聊天模式",
+  "chatModes": {
+    "auto": "自动",
+    "quick": "快速",
+    "thinking": "思考"
+  },
   "placeholder": "在想些什么？...",
   "enterToSend": "（回车发送）",
   "regenerate": "重新生成",

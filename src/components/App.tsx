@@ -9,7 +9,6 @@ import {
     Folder01Icon,
     GridIcon,
     HelpCircleIcon,
-    Mail01Icon,
     Menu01Icon,
     Search01Icon,
     Settings01Icon
@@ -117,17 +116,27 @@ export default function App() {
     }, [handleNewChat]);
 
     const bgToUse = resolvedDark ? darkBg : lightBg;
+    const topBlendStyle = {
+        background: 'linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0))',
+        WebkitBackdropFilter: 'blur(12px)',
+        backdropFilter: 'blur(12px)',
+        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)',
+        maskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)'
+    };
 
     return (
         <div
-            className="flex flex-col h-screen w-full font-sans overflow-hidden bg-cover bg-center text-white transition-all duration-500"
+            className="relative isolate flex h-screen w-full font-sans overflow-hidden bg-cover bg-center text-white transition-all duration-500"
             style={{
                 backgroundImage: `url("https://images.unsplash.com/${bgToUse}?q=80&w=2000&auto=format&fit=crop")`
             }}
         >
-            <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[72px]"
+                style={topBlendStyle}
+            ></div>
 
-            <div className="h-16 flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shrink-0 relative z-20">
+            <div className="absolute inset-x-0 top-0 h-16 flex items-center px-2 sm:px-4 gap-2 sm:gap-4 z-30">
                 <div className="flex items-center gap-2 sm:gap-4 w-auto sm:w-[240px] shrink-0">
                     <button
                         onClick={() => setIsSidebarOpen((prev) => !prev)}
@@ -136,10 +145,10 @@ export default function App() {
                         <Menu01Icon size={20} />
                     </button>
                     <span className="text-lg sm:text-xl font-medium text-white flex items-center gap-2">
-                        <div className="w-6 h-6 bg-red-500 rounded-sm items-center justify-center hidden sm:flex">
-                            <Mail01Icon size={14} className="text-white" />
+                        <div className="w-8 h-8 rounded-sm items-center justify-center hidden sm:flex">
+                            <img src="/favicon.ico" />
                         </div>
-                        <span className="hidden sm:inline">ChatMail</span>
+                        <span className="hidden sm:inline">校园百事通</span>
                     </span>
                 </div>
 
@@ -192,9 +201,9 @@ export default function App() {
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden relative z-10 pb-2 px-2 sm:pr-2 sm:pl-0">
+            <div className="absolute inset-0 flex overflow-hidden z-10 sm:pl-0">
                 <div
-                    className={`absolute sm:relative z-20 h-full bg-[#1a1a1a]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none flex flex-col shrink-0 transition-all duration-300 ${
+                    className={`absolute sm:relative z-20 h-full pt-16 bg-[#1a1a1a]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none flex flex-col shrink-0 transition-all duration-300 ${
                         isSidebarOpen
                             ? 'w-[240px] pr-4 opacity-100 translate-x-0'
                             : 'w-0 pr-0 opacity-0 -translate-x-full sm:translate-x-0 overflow-hidden'
@@ -250,20 +259,24 @@ export default function App() {
                     </div>
                 </div>
 
-                <div className="flex-1 bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-lg overflow-hidden flex flex-col text-gray-800 dark:text-gray-200">
-                    {showSettings ? (
-                        <SettingsPage
-                            theme={theme}
-                            setTheme={setTheme}
-                            lightBg={lightBg}
-                            setLightBg={setLightBg}
-                            darkBg={darkBg}
-                            setDarkBg={setDarkBg}
-                            onClose={() => setShowSettings(false)}
-                        />
-                    ) : (
-                        <MainChat messages={messages} setMessages={setMessages} />
-                    )}
+                <div className="relative flex-1 overflow-hidden flex flex-col text-gray-800 dark:text-gray-200">
+                    <div className="relative z-0 flex min-h-0 flex-1 flex-col">
+                        {showSettings ? (
+                            <div className="flex min-h-0 flex-1 pt-16">
+                                <SettingsPage
+                                    theme={theme}
+                                    setTheme={setTheme}
+                                    lightBg={lightBg}
+                                    setLightBg={setLightBg}
+                                    darkBg={darkBg}
+                                    setDarkBg={setDarkBg}
+                                    onClose={() => setShowSettings(false)}
+                                />
+                            </div>
+                        ) : (
+                            <MainChat messages={messages} setMessages={setMessages} />
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
