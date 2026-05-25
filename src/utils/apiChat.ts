@@ -1,5 +1,12 @@
-const apiBaseUrl = (import.meta.env.VITE_SCHOOLGPT_API_BASE_URL ?? 'http://127.0.0.1:8000/api').replace(/\/+$/, '');
-const apiToken = import.meta.env.VITE_SCHOOLGPT_API_TOKEN ?? 'my-super-secret-token';
+import { apiBaseUrl } from './apiConfig';
+import { getAccessToken } from './auth';
+
+export class ApiAuthError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ApiAuthError';
+    }
+}
 
 type ChatChunkHandler = (content: string) => void;
 
@@ -82,18 +89,23 @@ const normalizePayload = (dataText: string): string => {
 };
 
 export const streamChat = async (query: string, onChunk: ChatChunkHandler): Promise<void> => {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+        throw new ApiAuthError('请先登录');
+    }
+
     const response = await fetch(`${apiBaseUrl}/chat`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiToken}`,
+            Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ query }),
     });
 
     if (!response.ok) {
         if (response.status === 401) {
-            throw new Error('鉴权失败：Token 无效');
+            throw new ApiAuthError('登录已过期，请重新登录');
         }
 
         throw new Error('网络请求失败');

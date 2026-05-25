@@ -14,16 +14,19 @@ import {
     Settings01Icon
 } from 'hugeicons-react';
 import ChatItem from './ChatItem';
+import LoginPage from './LoginPage';
 import MainChat from './MainChat';
 import ProfilePanel from './ProfilePanel';
 import SettingsPage from './SettingsPage';
 import { DARK_BG, LIGHT_BG } from '../utils/backgrounds';
+import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
 import type { Message } from '../utils/types';
 
 export default function App() {
     const { t } = useTranslation();
     const [showSettings, setShowSettings] = useState(false);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
+    const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
     const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(
         () => (localStorage.getItem('theme') as 'system' | 'light' | 'dark') || 'system'
     );
@@ -48,6 +51,18 @@ export default function App() {
                 "Sure, I can help you get started with creating a chatbot using GPT in Python. Here are the basic steps you'll need to follow:\n\n1. **Install the required libraries:** You'll need to install the transformers library from Hugging Face to use GPT. You can install it using pip.\n2. **Load the pre-trained model:** GPT comes in several sizes and versions, so you'll need to choose the one that fits your needs. You can load a pre-trained GPT model. This loads the 1.3B parameter version of GPT-Neo, which is a powerful and relatively recent model.\n3. **Create a chatbot loop:** You'll need to create a loop that takes user input, generates a response using the GPT model, and outputs it to the user. Here's an example loop that uses the input() function to get user input and the gpt() function to generate a response. This loop will keep running until the user exits the program or the loop is interrupted.\n4. **Add some personality to the chatbot:** While GPT can generate text, it doesn't have any inherent personality or style. You can make your chatbot more interesting by adding custom prompts or responses that reflect your desired personality. You can then modify the chatbot loop to use these prompts and responses when appropriate. This will make the chatbot seem more human-like and engaging.\n\nThese are just the basic steps to get started with a GPT chatbot in Python. Depending on your requirements, you may need to add more features or complexity to the chatbot. Good luck!"
         }
     ]);
+
+    const handleLogin = useCallback((nextSession: AuthSession) => {
+        setSession(nextSession);
+    }, []);
+
+    const handleLogout = useCallback(() => {
+        clearAuthSession();
+        setSession(null);
+        setShowProfilePanel(false);
+        setShowSettings(false);
+        setMessages([]);
+    }, []);
 
     const handleNewChat = useCallback(() => {
         setMessages([]);
@@ -116,6 +131,9 @@ export default function App() {
     }, [handleNewChat]);
 
     const bgToUse = resolvedDark ? darkBg : lightBg;
+    const backgroundStyle = {
+        backgroundImage: `url("https://images.unsplash.com/${bgToUse}?q=80&w=2000&auto=format&fit=crop")`
+    };
     const topBlendStyle = {
         background: 'linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0))',
         WebkitBackdropFilter: 'blur(12px)',
@@ -124,12 +142,24 @@ export default function App() {
         maskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)'
     };
 
+    if (!session) {
+        return (
+            <div
+                className="relative isolate min-h-screen w-full overflow-hidden bg-cover bg-center font-sans transition-all duration-500"
+                style={backgroundStyle}
+            >
+                <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
+                <LoginPage onLogin={handleLogin} />
+            </div>
+        );
+    }
+
+    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(session.user.username)}`;
+
     return (
         <div
             className="relative isolate flex h-screen w-full font-sans overflow-hidden bg-cover bg-center text-white transition-all duration-500"
-            style={{
-                backgroundImage: `url("https://images.unsplash.com/${bgToUse}?q=80&w=2000&auto=format&fit=crop")`
-            }}
+            style={backgroundStyle}
         >
             <div
                 className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[72px]"
@@ -192,12 +222,18 @@ export default function App() {
                         className="rounded-full flex items-center justify-center relative ml-1 sm:ml-2 outline-none"
                     >
                         <img
-                            src="https://i.pravatar.cc/150?u=andrew"
+                            src={avatarUrl}
                             alt="Profile"
                             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-white/20 transition-transform hover:scale-105 object-cover"
                         />
                     </button>
-                    {showProfilePanel && <ProfilePanel onClose={() => setShowProfilePanel(false)} />}
+                    {showProfilePanel && (
+                        <ProfilePanel
+                            user={session.user}
+                            onClose={() => setShowProfilePanel(false)}
+                            onLogout={handleLogout}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -274,7 +310,11 @@ export default function App() {
                                 />
                             </div>
                         ) : (
-                            <MainChat messages={messages} setMessages={setMessages} />
+                            <MainChat
+                                messages={messages}
+                                setMessages={setMessages}
+                                onAuthExpired={handleLogout}
+                            />
                         )}
                     </div>
                 </div>

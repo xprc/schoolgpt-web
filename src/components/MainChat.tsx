@@ -18,12 +18,13 @@ import {
     VolumeUpIcon
 } from 'hugeicons-react';
 import CodeBlock from './CodeBlock';
-import { streamChat } from '../utils/apiChat';
+import { ApiAuthError, streamChat } from '../utils/apiChat';
 import type { Message } from '../utils/types';
 
 type MainChatProps = {
     messages: Message[];
     setMessages: Dispatch<SetStateAction<Message[]>>;
+    onAuthExpired: () => void;
 };
 
 type SpeechRecognitionAlternativeLike = {
@@ -79,7 +80,7 @@ const createMessageId = (prefix: string) => {
     return `${prefix}-${messageIdCounter}`;
 };
 
-export default function MainChat({ messages, setMessages }: MainChatProps) {
+export default function MainChat({ messages, setMessages, onAuthExpired }: MainChatProps) {
     const { t, i18n } = useTranslation();
     const [input, setInput] = useState('');
     const [mode, setMode] = useState<ChatMode>('auto');
@@ -218,6 +219,10 @@ export default function MainChat({ messages, setMessages }: MainChatProps) {
                         : m
                 )
             );
+
+            if (error instanceof ApiAuthError) {
+                onAuthExpired();
+            }
         } finally {
             setIsLoading(false);
         }
