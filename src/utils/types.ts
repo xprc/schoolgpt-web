@@ -17,6 +17,9 @@ export type Conversation = {
     shareScope: ConversationShareScope;
     permission: ConversationPermission;
     canWrite: boolean;
+    isPinned: boolean;
+    pinnedAt: string | null;
+    isVisible: boolean;
     createdAt: string;
     updatedAt: string;
     messages: Message[];
@@ -28,6 +31,9 @@ export type ConversationSummary = {
     shareScope: ConversationShareScope;
     permission: ConversationPermission;
     canWrite: boolean;
+    isPinned: boolean;
+    pinnedAt: string | null;
+    isVisible: boolean;
     createdAt: string;
     updatedAt: string;
 };

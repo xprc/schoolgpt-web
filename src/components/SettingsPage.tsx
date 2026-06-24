@@ -103,7 +103,7 @@ export default function SettingsPage({
                                             }`}
                                         >
                                             <img
-                                                src={`https://images.unsplash.com/${bg}?q=80&w=400&auto=format&fit=crop`}
+                                                src={bg}
                                                 alt="Background"
                                                 className="w-full h-full object-cover"
                                             />
@@ -129,7 +129,7 @@ export default function SettingsPage({
                                             }`}
                                         >
                                             <img
-                                                src={`https://images.unsplash.com/${bg}?q=80&w=400&auto=format&fit=crop`}
+                                                src={bg}
                                                 alt="Background"
                                                 className="w-full h-full object-cover"
                                             />

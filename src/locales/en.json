@@ -52,5 +52,13 @@
   "copied": "Copied",
   "readOnlyConversation": "This is a read-only shared conversation.",
   "noConversations": "No conversations yet",
-  "loadingConversation": "Loading conversation..."
+  "loadingConversation": "Loading conversation...",
+  "conversationOptions": "Conversation options",
+  "pinConversation": "Pin",
+  "unpinConversation": "Unpin",
+  "pinnedConversation": "Pinned",
+  "renameConversation": "Rename",
+  "renameInputPlaceholder": "Conversation name",
+  "deleteConversation": "Delete",
+  "deleteConversationConfirm": "Delete \"{{title}}\"?"
 }

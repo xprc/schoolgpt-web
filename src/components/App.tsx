@@ -29,20 +29,25 @@ import LoginPage from './LoginPage';
 import MainChat from './MainChat';
 import ProfilePanel from './ProfilePanel';
 import SettingsPage from './SettingsPage';
-import { DARK_BG, LIGHT_BG } from '../utils/backgrounds';
+import { DARK_BG, LIGHT_BG, normalizeBackground } from '../utils/backgrounds';
 import {
     ApiRequestError,
+    deleteRemoteConversation,
     fetchRemoteConversation,
     fetchRemoteConversationList,
+    renameRemoteConversation,
     saveRemoteConversation,
+    updateRemoteConversationPin,
     updateRemoteConversationShare,
 } from '../utils/apiConversations';
 import { ApiAuthError } from '../utils/apiChat';
 import {
+    deleteLocalConversation,
+    deleteLocalConversationsNotInRemote,
     getLocalConversation,
-    listLocalConversationSummaries,
     saveLocalConversation,
 } from '../utils/chatStore';
+import { getGravatarAvatarUrl, getGravatarFallbackAvatarUrl } from '../utils/gravatar';
 import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
 import type {
     Conversation,
@@ -52,6 +57,7 @@ import type {
 } from '../utils/types';
 
 const defaultConversationTitle = '新对话';
+const draftConversationId = '';
 const chatRoutePattern =
     /^\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
@@ -80,7 +86,11 @@ const createConversationId = (): string => {
 
 const nowIso = (): string => new Date().toISOString();
 
-const timestampMs = (value: string): number => {
+const timestampMs = (value: string | null): number => {
+    if (!value) {
+        return 0;
+    }
+
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : 0;
 };
@@ -100,6 +110,9 @@ const createEmptyConversation = (conversationId: string, userId: number): Conver
         shareScope: 'private',
         permission: 'owner',
         canWrite: true,
+        isPinned: false,
+        pinnedAt: null,
+        isVisible: true,
         createdAt,
         updatedAt: createdAt,
         messages: [],
@@ -107,9 +120,14 @@ const createEmptyConversation = (conversationId: string, userId: number): Conver
 };
 
 const withMessages = (conversation: Conversation, messages: Message[]): Conversation => {
+    const shouldDeriveTitle =
+        !conversation.title.trim() || conversation.title === defaultConversationTitle;
+
     return {
         ...conversation,
-        title: deriveConversationTitle(messages, conversation.title),
+        title: shouldDeriveTitle
+            ? deriveConversationTitle(messages, conversation.title)
+            : conversation.title,
         updatedAt: nowIso(),
         messages,
     };
@@ -122,34 +140,38 @@ const toSummary = (conversation: Conversation): ConversationSummary => {
         shareScope: conversation.shareScope,
         permission: conversation.permission,
         canWrite: conversation.canWrite,
+        isPinned: conversation.isPinned,
+        pinnedAt: conversation.pinnedAt,
+        isVisible: conversation.isVisible,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
     };
 };
 
-const mergeSummaries = (
-    localSummaries: ConversationSummary[],
-    remoteSummaries: ConversationSummary[]
+const sortConversationSummaries = (
+    summaries: ConversationSummary[]
 ): ConversationSummary[] => {
-    const summaries = new Map<string, ConversationSummary>();
-
-    [...localSummaries, ...remoteSummaries].forEach((summary) => {
-        const existing = summaries.get(summary.id);
-        if (!existing || timestampMs(summary.updatedAt) >= timestampMs(existing.updatedAt)) {
-            summaries.set(summary.id, summary);
+    return [...summaries].sort((a, b) => {
+        if (a.isPinned !== b.isPinned) {
+            return a.isPinned ? -1 : 1;
         }
-    });
 
-    return Array.from(summaries.values()).sort(
-        (a, b) => timestampMs(b.updatedAt) - timestampMs(a.updatedAt)
-    );
+        const aTime = a.isPinned ? timestampMs(a.pinnedAt) : timestampMs(a.updatedAt);
+        const bTime = b.isPinned ? timestampMs(b.pinnedAt) : timestampMs(b.updatedAt);
+        return bTime - aTime;
+    });
 };
 
 const upsertSummary = (
     summaries: ConversationSummary[],
     summary: ConversationSummary
 ): ConversationSummary[] => {
-    return mergeSummaries([summary], summaries);
+    return sortConversationSummaries(
+        [
+            summary,
+            ...summaries.filter((existingSummary) => existingSummary.id !== summary.id),
+        ].filter((nextSummary) => nextSummary.isVisible !== false)
+    );
 };
 
 export default function App() {
@@ -166,15 +188,19 @@ export default function App() {
     const [conversationSummaries, setConversationSummaries] = useState<ConversationSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [syncError, setSyncError] = useState<string | null>(null);
-    const autoCreatedRouteRef = useRef(false);
+    const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null);
+    const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
+    const [renameDraft, setRenameDraft] = useState('');
+    const clientCreatedConversationIdsRef = useRef(new Set<string>());
+    const [avatarUrl, setAvatarUrl] = useState(() => getGravatarFallbackAvatarUrl(''));
     const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(
         () => (localStorage.getItem('theme') as 'system' | 'light' | 'dark') || 'system'
     );
     const [lightBg, setLightBg] = useState(
-        () => localStorage.getItem('lightBg') || LIGHT_BG[0]
+        () => normalizeBackground(localStorage.getItem('lightBg'), LIGHT_BG[0])
     );
     const [darkBg, setDarkBg] = useState(
-        () => localStorage.getItem('darkBg') || DARK_BG[0]
+        () => normalizeBackground(localStorage.getItem('darkBg'), DARK_BG[0])
     );
     const [resolvedDark, setResolvedDark] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -191,6 +217,24 @@ export default function App() {
         setRouteConversationId(conversationId);
         setShowSettings(false);
         setShowSharePanel(false);
+        setOpenConversationMenuId(null);
+        setRenamingConversationId(null);
+    }, []);
+
+    const navigateToDraftConversation = useCallback((replace = false) => {
+        const nextPath = '/';
+        if (window.location.pathname !== nextPath) {
+            if (replace) {
+                window.history.replaceState({}, '', nextPath);
+            } else {
+                window.history.pushState({}, '', nextPath);
+            }
+        }
+        setRouteConversationId(null);
+        setShowSettings(false);
+        setShowSharePanel(false);
+        setOpenConversationMenuId(null);
+        setRenamingConversationId(null);
     }, []);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
@@ -203,10 +247,12 @@ export default function App() {
         setShowProfilePanel(false);
         setShowSettings(false);
         setShowSharePanel(false);
+        setOpenConversationMenuId(null);
+        setRenamingConversationId(null);
         setCurrentConversation(null);
         setConversationSummaries([]);
         setSyncError(null);
-        autoCreatedRouteRef.current = false;
+        clientCreatedConversationIdsRef.current.clear();
     }, []);
 
     const refreshConversationList = useCallback(async () => {
@@ -216,10 +262,16 @@ export default function App() {
         }
 
         try {
-            const localSummaries = await listLocalConversationSummaries(session.user.id);
-            setConversationSummaries(localSummaries);
+            setSyncError(null);
             const remoteSummaries = await fetchRemoteConversationList();
-            setConversationSummaries(mergeSummaries(localSummaries, remoteSummaries));
+            const visibleRemoteSummaries = sortConversationSummaries(
+                remoteSummaries.filter((summary) => summary.isVisible !== false)
+            );
+            await deleteLocalConversationsNotInRemote(
+                session.user.id,
+                new Set(visibleRemoteSummaries.map((summary) => summary.id))
+            );
+            setConversationSummaries(visibleRemoteSummaries);
         } catch (error: unknown) {
             if (error instanceof ApiAuthError) {
                 handleLogout();
@@ -231,15 +283,26 @@ export default function App() {
         }
     }, [handleLogout, session]);
 
+    useEffect(() => {
+        void refreshConversationList();
+    }, [refreshConversationList]);
+
+    useEffect(() => {
+        if (!session) {
+            setAvatarUrl(getGravatarFallbackAvatarUrl(''));
+            return;
+        }
+
+        const avatarName = session.user.displayName || session.user.username;
+        setAvatarUrl(getGravatarAvatarUrl(session.user.avatarSha256, avatarName));
+    }, [session]);
+
     const handleNewChat = useCallback(() => {
         if (!session) return;
 
-        const conversation = createEmptyConversation(createConversationId(), session.user.id);
-        setCurrentConversation(conversation);
-        setConversationSummaries((prev) => upsertSummary(prev, toSummary(conversation)));
-        void saveLocalConversation(session.user.id, conversation);
-        navigateToConversation(conversation.id);
-    }, [navigateToConversation, session]);
+        setCurrentConversation(createEmptyConversation(draftConversationId, session.user.id));
+        navigateToDraftConversation();
+    }, [navigateToDraftConversation, session]);
 
     const handleOpenConversation = useCallback(
         (conversationId: string) => {
@@ -253,6 +316,8 @@ export default function App() {
             setRouteConversationId(readConversationIdFromLocation());
             setShowSettings(false);
             setShowSharePanel(false);
+            setOpenConversationMenuId(null);
+            setRenamingConversationId(null);
         };
 
         window.addEventListener('popstate', handlePopState);
@@ -260,24 +325,38 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        if (!openConversationMenuId) {
+            return;
+        }
+
+        const handlePointerDown = () => {
+            setOpenConversationMenuId(null);
+        };
+
+        window.addEventListener('pointerdown', handlePointerDown);
+        return () => window.removeEventListener('pointerdown', handlePointerDown);
+    }, [openConversationMenuId]);
+
+    useEffect(() => {
         if (!session || routeConversationId) {
             return;
         }
 
-        if (autoCreatedRouteRef.current) {
-            return;
-        }
-
-        autoCreatedRouteRef.current = true;
-        const conversation = createEmptyConversation(createConversationId(), session.user.id);
-        setCurrentConversation(conversation);
-        setConversationSummaries((prev) => upsertSummary(prev, toSummary(conversation)));
-        void saveLocalConversation(session.user.id, conversation);
-        navigateToConversation(conversation.id, true);
-    }, [navigateToConversation, routeConversationId, session]);
+        setCurrentConversation((prev) =>
+            prev && prev.id === draftConversationId
+                ? prev
+                : createEmptyConversation(draftConversationId, session.user.id)
+        );
+        setShowSharePanel(false);
+    }, [routeConversationId, session]);
 
     useEffect(() => {
         if (!session || !routeConversationId) {
+            return;
+        }
+
+        if (clientCreatedConversationIdsRef.current.has(routeConversationId)) {
+            clientCreatedConversationIdsRef.current.delete(routeConversationId);
             return;
         }
 
@@ -321,10 +400,15 @@ export default function App() {
                 }
 
                 if (error instanceof ApiRequestError && error.status === 404) {
-                    if (localConversation) {
-                        await saveLocalConversation(session.user.id, localConversation);
-                    } else {
-                        await saveLocalConversation(session.user.id, emptyConversation);
+                    await deleteLocalConversation(session.user.id, routeConversationId);
+                    if (!cancelled) {
+                        setConversationSummaries((prev) =>
+                            prev.filter((summary) => summary.id !== routeConversationId)
+                        );
+                        setCurrentConversation(
+                            createEmptyConversation(draftConversationId, session.user.id)
+                        );
+                        navigateToDraftConversation(true);
                     }
                     return;
                 }
@@ -341,16 +425,21 @@ export default function App() {
         return () => {
             cancelled = true;
         };
-    }, [handleLogout, refreshConversationList, routeConversationId, session]);
+    }, [
+        handleLogout,
+        navigateToDraftConversation,
+        refreshConversationList,
+        routeConversationId,
+        session,
+    ]);
 
     useEffect(() => {
-        if (!session || !currentConversation) {
+        if (!session || !currentConversation || currentConversation.id === draftConversationId) {
             return;
         }
 
         const timer = window.setTimeout(() => {
             void saveLocalConversation(session.user.id, currentConversation);
-            setConversationSummaries((prev) => upsertSummary(prev, toSummary(currentConversation)));
         }, 300);
 
         return () => window.clearTimeout(timer);
@@ -367,15 +456,34 @@ export default function App() {
         });
     }, []);
 
+    const ensureCurrentConversationId = useCallback(() => {
+        if (!session || !currentConversation) {
+            return null;
+        }
+
+        if (currentConversation.id !== draftConversationId) {
+            return currentConversation.id;
+        }
+
+        const conversation = createEmptyConversation(createConversationId(), session.user.id);
+        clientCreatedConversationIdsRef.current.add(conversation.id);
+        setCurrentConversation(withMessages(conversation, currentConversation.messages));
+        navigateToConversation(conversation.id, true);
+        return conversation.id;
+    }, [currentConversation, navigateToConversation, session]);
+
     const handleMessagesCommitted = useCallback(
-        async (messages: Message[]) => {
-            if (!session || !currentConversation) {
+        async (conversationId: string, messages: Message[]) => {
+            if (!session) {
                 return;
             }
 
-            const nextConversation = withMessages(currentConversation, messages);
+            const baseConversation =
+                currentConversation?.id === conversationId
+                    ? currentConversation
+                    : createEmptyConversation(conversationId, session.user.id);
+            const nextConversation = withMessages(baseConversation, messages);
             setCurrentConversation(nextConversation);
-            setConversationSummaries((prev) => upsertSummary(prev, toSummary(nextConversation)));
             await saveLocalConversation(session.user.id, nextConversation);
 
             if (!nextConversation.canWrite) {
@@ -403,9 +511,84 @@ export default function App() {
         [currentConversation, handleLogout, session]
     );
 
+    const saveConversationMetadataLocally = useCallback(
+        async (
+            conversationId: string,
+            patch: Partial<
+                Pick<
+                    Conversation,
+                    'title' | 'isPinned' | 'pinnedAt' | 'isVisible' | 'updatedAt'
+                >
+            >
+        ) => {
+            if (!session) {
+                return;
+            }
+
+            const localConversation =
+                currentConversation?.id === conversationId
+                    ? currentConversation
+                    : await getLocalConversation(session.user.id, conversationId);
+
+            if (!localConversation) {
+                return;
+            }
+
+            await saveLocalConversation(session.user.id, {
+                ...localConversation,
+                ...patch,
+            });
+        },
+        [currentConversation, session]
+    );
+
+    const commitRemoteConversation = useCallback(
+        async (conversation: Conversation) => {
+            if (!session) {
+                return;
+            }
+
+            setCurrentConversation((prev) =>
+                prev?.id === conversation.id ? conversation : prev
+            );
+            setConversationSummaries((prev) => upsertSummary(prev, toSummary(conversation)));
+            await saveLocalConversation(session.user.id, conversation);
+        },
+        [session]
+    );
+
+    const removeMissingRemoteConversation = useCallback(
+        async (conversationId: string) => {
+            if (!session) {
+                return;
+            }
+
+            await deleteLocalConversation(session.user.id, conversationId);
+            setConversationSummaries((prev) =>
+                prev.filter((summary) => summary.id !== conversationId)
+            );
+
+            if (currentConversation?.id === conversationId || routeConversationId === conversationId) {
+                setCurrentConversation(createEmptyConversation(draftConversationId, session.user.id));
+                navigateToDraftConversation(true);
+            }
+        },
+        [
+            currentConversation?.id,
+            navigateToDraftConversation,
+            routeConversationId,
+            session,
+        ]
+    );
+
     const handleShareScopeChange = useCallback(
         async (shareScope: ConversationShareScope) => {
-            if (!session || !currentConversation || currentConversation.permission !== 'owner') {
+            if (
+                !session ||
+                !currentConversation ||
+                currentConversation.id === draftConversationId ||
+                currentConversation.permission !== 'owner'
+            ) {
                 return;
             }
 
@@ -415,9 +598,6 @@ export default function App() {
                 updatedAt: nowIso(),
             };
             setCurrentConversation(optimisticConversation);
-            setConversationSummaries((prev) =>
-                upsertSummary(prev, toSummary(optimisticConversation))
-            );
             await saveLocalConversation(session.user.id, optimisticConversation);
 
             try {
@@ -442,7 +622,190 @@ export default function App() {
         [currentConversation, handleLogout, session]
     );
 
-    const shareUrl = currentConversation
+    const handleStartRenameConversation = useCallback(
+        (summary: ConversationSummary) => {
+            if (summary.permission !== 'owner') {
+                return;
+            }
+
+            setRenameDraft(summary.title || t('newChat'));
+            setRenamingConversationId(summary.id);
+            setOpenConversationMenuId(null);
+        },
+        [t]
+    );
+
+    const handleCancelRenameConversation = useCallback(() => {
+        setRenamingConversationId(null);
+        setRenameDraft('');
+    }, []);
+
+    const handleRenameConversation = useCallback(
+        async (summary: ConversationSummary) => {
+            if (!session || summary.permission !== 'owner') {
+                return;
+            }
+
+            const title = renameDraft.trim() || defaultConversationTitle;
+            const updatedAt = nowIso();
+
+            setRenamingConversationId(null);
+            setRenameDraft('');
+            setCurrentConversation((prev) =>
+                prev?.id === summary.id ? { ...prev, title, updatedAt } : prev
+            );
+            await saveConversationMetadataLocally(summary.id, { title, updatedAt });
+
+            try {
+                const savedConversation = await renameRemoteConversation(summary.id, title);
+                await commitRemoteConversation(savedConversation);
+                setSyncError(null);
+            } catch (error: unknown) {
+                if (error instanceof ApiRequestError && error.status === 404) {
+                    await removeMissingRemoteConversation(summary.id);
+                    setSyncError(null);
+                    return;
+                }
+
+                if (error instanceof ApiAuthError) {
+                    handleLogout();
+                    return;
+                }
+
+                const message = error instanceof Error ? error.message : String(error);
+                setSyncError(message);
+            }
+        },
+        [
+            commitRemoteConversation,
+            handleLogout,
+            renameDraft,
+            removeMissingRemoteConversation,
+            saveConversationMetadataLocally,
+            session,
+        ]
+    );
+
+    const handleToggleConversationPin = useCallback(
+        async (summary: ConversationSummary) => {
+            if (!session || summary.permission !== 'owner') {
+                return;
+            }
+
+            const nextPinned = !summary.isPinned;
+            const updatedAt = nowIso();
+            const optimisticSummary: ConversationSummary = {
+                ...summary,
+                isPinned: nextPinned,
+                pinnedAt: nextPinned ? updatedAt : null,
+                updatedAt,
+            };
+
+            setOpenConversationMenuId(null);
+            setCurrentConversation((prev) =>
+                prev?.id === summary.id
+                    ? {
+                        ...prev,
+                        isPinned: optimisticSummary.isPinned,
+                        pinnedAt: optimisticSummary.pinnedAt,
+                        updatedAt,
+                    }
+                    : prev
+            );
+            await saveConversationMetadataLocally(summary.id, {
+                isPinned: optimisticSummary.isPinned,
+                pinnedAt: optimisticSummary.pinnedAt,
+                updatedAt,
+            });
+
+            try {
+                const savedConversation = await updateRemoteConversationPin(
+                    summary.id,
+                    nextPinned
+                );
+                await commitRemoteConversation(savedConversation);
+                setSyncError(null);
+            } catch (error: unknown) {
+                if (error instanceof ApiRequestError && error.status === 404) {
+                    await removeMissingRemoteConversation(summary.id);
+                    setSyncError(null);
+                    return;
+                }
+
+                if (error instanceof ApiAuthError) {
+                    handleLogout();
+                    return;
+                }
+
+                const message = error instanceof Error ? error.message : String(error);
+                setSyncError(message);
+            }
+        },
+        [
+            commitRemoteConversation,
+            handleLogout,
+            removeMissingRemoteConversation,
+            saveConversationMetadataLocally,
+            session,
+        ]
+    );
+
+    const handleDeleteConversation = useCallback(
+        async (summary: ConversationSummary) => {
+            if (!session || summary.permission !== 'owner') {
+                return;
+            }
+
+            const confirmed = window.confirm(
+                t('deleteConversationConfirm', { title: summary.title || t('newChat') })
+            );
+            if (!confirmed) {
+                return;
+            }
+
+            setOpenConversationMenuId(null);
+            setRenamingConversationId(null);
+            setConversationSummaries((prev) =>
+                prev.filter((conversation) => conversation.id !== summary.id)
+            );
+            await deleteLocalConversation(session.user.id, summary.id);
+
+            if (currentConversation?.id === summary.id || routeConversationId === summary.id) {
+                setCurrentConversation(createEmptyConversation(draftConversationId, session.user.id));
+                navigateToDraftConversation(true);
+            }
+
+            try {
+                await deleteRemoteConversation(summary.id);
+                setSyncError(null);
+            } catch (error: unknown) {
+                if (error instanceof ApiAuthError) {
+                    handleLogout();
+                    return;
+                }
+
+                if (error instanceof ApiRequestError && error.status === 404) {
+                    setSyncError(null);
+                    return;
+                }
+
+                const message = error instanceof Error ? error.message : String(error);
+                setSyncError(message);
+                void refreshConversationList();
+            }
+        },
+        [
+            currentConversation?.id,
+            handleLogout,
+            navigateToDraftConversation,
+            refreshConversationList,
+            routeConversationId,
+            session,
+            t,
+        ]
+    );
+
+    const shareUrl = currentConversation && currentConversation.id !== draftConversationId
         ? `${window.location.origin}/chat/${currentConversation.id}`
         : '';
 
@@ -519,11 +882,11 @@ export default function App() {
     const filteredConversationSummaries = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         if (!query) {
-            return conversationSummaries;
+            return conversationSummaries.filter((summary) => summary.isVisible !== false);
         }
 
         return conversationSummaries.filter((summary) =>
-            summary.title.toLowerCase().includes(query)
+            summary.isVisible !== false && summary.title.toLowerCase().includes(query)
         );
     }, [conversationSummaries, searchQuery]);
 
@@ -535,7 +898,7 @@ export default function App() {
 
     const bgToUse = resolvedDark ? darkBg : lightBg;
     const backgroundStyle = {
-        backgroundImage: `url("https://images.unsplash.com/${bgToUse}?q=80&w=2000&auto=format&fit=crop")`,
+        backgroundImage: `url("${bgToUse}")`,
     };
     const topBlendStyle = {
         background: 'linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0))',
@@ -556,8 +919,6 @@ export default function App() {
             </div>
         );
     }
-
-    const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(session.user.username)}`;
 
     return (
         <div
@@ -608,7 +969,7 @@ export default function App() {
                         <span className="text-sm">{t('online')}</span>
                         <ArrowDown01Icon size={14} className="ml-1" />
                     </div>
-                    {currentConversation && (
+                    {currentConversation && currentConversation.id !== draftConversationId && (
                         <div className="relative">
                             <button
                                 onClick={() => setShowSharePanel((prev) => !prev)}
@@ -751,7 +1112,23 @@ export default function App() {
                                     key={summary.id}
                                     text={summary.title || t('newChat')}
                                     active={summary.id === currentConversation?.id}
+                                    pinned={summary.isPinned}
+                                    canManage={summary.permission === 'owner'}
+                                    menuOpen={openConversationMenuId === summary.id}
+                                    renaming={renamingConversationId === summary.id}
+                                    renameValue={renameDraft}
                                     onClick={() => handleOpenConversation(summary.id)}
+                                    onMenuToggle={() =>
+                                        setOpenConversationMenuId((prev) =>
+                                            prev === summary.id ? null : summary.id
+                                        )
+                                    }
+                                    onPinToggle={() => handleToggleConversationPin(summary)}
+                                    onRenameStart={() => handleStartRenameConversation(summary)}
+                                    onRenameValueChange={setRenameDraft}
+                                    onRenameSubmit={() => handleRenameConversation(summary)}
+                                    onRenameCancel={handleCancelRenameConversation}
+                                    onDelete={() => handleDeleteConversation(summary)}
                                 />
                             ))
                         )}
@@ -774,10 +1151,10 @@ export default function App() {
                             </div>
                         ) : currentConversation ? (
                             <MainChat
-                                conversationId={currentConversation.id}
                                 canWrite={currentConversation.canWrite}
                                 messages={currentConversation.messages}
                                 setMessages={setMessages}
+                                ensureConversationId={ensureCurrentConversationId}
                                 onMessagesCommitted={handleMessagesCommitted}
                                 onAuthExpired={handleLogout}
                             />

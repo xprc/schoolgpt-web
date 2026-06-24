@@ -4,6 +4,7 @@ export type AuthUser = {
     id: number;
     username: string;
     email: string;
+    avatarSha256: string;
     displayName: string;
 };
 
@@ -19,6 +20,7 @@ type LoginResponse = {
         id: number;
         username: string;
         email: string;
+        avatar_sha256: string;
         display_name: string;
     };
 };
@@ -34,6 +36,7 @@ const normalizeUser = (user: LoginResponse['user']): AuthUser => {
         id: user.id,
         username: user.username,
         email: user.email,
+        avatarSha256: user.avatar_sha256,
         displayName: user.display_name,
     };
 };
@@ -84,6 +87,7 @@ export const getStoredSession = (): AuthSession | null => {
                 id: user.id,
                 username: user.username,
                 email: user.email,
+                avatarSha256: typeof user.avatarSha256 === 'string' ? user.avatarSha256 : '',
                 displayName: user.displayName,
             },
         };

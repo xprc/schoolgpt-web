@@ -23,6 +23,9 @@ type ConversationResponse = {
     share_scope: ConversationShareScope;
     permission: 'owner' | 'read' | 'write';
     can_write: boolean;
+    is_pinned: boolean;
+    pinned_at: string | null;
+    is_visible: boolean;
     created_at: string;
     updated_at: string;
     messages: ConversationMessageResponse[];
@@ -34,6 +37,9 @@ type ConversationSummaryResponse = {
     share_scope: ConversationShareScope;
     permission: 'owner' | 'read' | 'write';
     can_write: boolean;
+    is_pinned: boolean;
+    pinned_at: string | null;
+    is_visible: boolean;
     created_at: string;
     updated_at: string;
 };
@@ -113,6 +119,9 @@ const normalizeConversation = (conversation: ConversationResponse): Conversation
         shareScope: conversation.share_scope,
         permission: conversation.permission,
         canWrite: conversation.can_write,
+        isPinned: conversation.is_pinned ?? false,
+        pinnedAt: conversation.pinned_at ?? null,
+        isVisible: conversation.is_visible ?? true,
         createdAt: conversation.created_at,
         updatedAt: conversation.updated_at,
         messages: conversation.messages.map(normalizeMessage),
@@ -126,6 +135,9 @@ const normalizeSummary = (summary: ConversationSummaryResponse): ConversationSum
         shareScope: summary.share_scope,
         permission: summary.permission,
         canWrite: summary.can_write,
+        isPinned: summary.is_pinned ?? false,
+        pinnedAt: summary.pinned_at ?? null,
+        isVisible: summary.is_visible ?? true,
         createdAt: summary.created_at,
         updatedAt: summary.updated_at,
     };
@@ -186,4 +198,44 @@ export const updateRemoteConversationShare = async (
     await ensureOk(response);
 
     return normalizeConversation((await response.json()) as ConversationResponse);
+};
+
+export const renameRemoteConversation = async (
+    conversationId: string,
+    title: string
+): Promise<Conversation> => {
+    const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}/rename`, {
+        method: 'PATCH',
+        headers: jsonAuthHeaders(),
+        body: JSON.stringify({
+            title,
+        }),
+    });
+    await ensureOk(response);
+
+    return normalizeConversation((await response.json()) as ConversationResponse);
+};
+
+export const updateRemoteConversationPin = async (
+    conversationId: string,
+    isPinned: boolean
+): Promise<Conversation> => {
+    const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}/pin`, {
+        method: 'PATCH',
+        headers: jsonAuthHeaders(),
+        body: JSON.stringify({
+            is_pinned: isPinned,
+        }),
+    });
+    await ensureOk(response);
+
+    return normalizeConversation((await response.json()) as ConversationResponse);
+};
+
+export const deleteRemoteConversation = async (conversationId: string): Promise<void> => {
+    const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
 };

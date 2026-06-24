@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import {
     Add01Icon,
@@ -22,11 +23,11 @@ import { ApiAuthError, streamChat } from '../utils/apiChat';
 import type { Message } from '../utils/types';
 
 type MainChatProps = {
-    conversationId: string;
     canWrite: boolean;
     messages: Message[];
     setMessages: Dispatch<SetStateAction<Message[]>>;
-    onMessagesCommitted: (messages: Message[]) => Promise<void>;
+    ensureConversationId: () => string | null;
+    onMessagesCommitted: (conversationId: string, messages: Message[]) => Promise<void>;
     onAuthExpired: () => void;
 };
 
@@ -85,10 +86,10 @@ const createMessageId = () => {
 };
 
 export default function MainChat({
-    conversationId,
     canWrite,
     messages,
     setMessages,
+    ensureConversationId,
     onMessagesCommitted,
     onAuthExpired,
 }: MainChatProps) {
@@ -161,11 +162,14 @@ export default function MainChat({
     const saveEdit = (id: string) => {
         if (!canWrite) return;
 
+        const conversationId = ensureConversationId();
+        if (!conversationId) return;
+
         const nextMessages = messages.map((m) =>
             m.id === id ? { ...m, content: editContent } : m
         );
         setMessages(nextMessages);
-        void onMessagesCommitted(nextMessages);
+        void onMessagesCommitted(conversationId, nextMessages);
         setEditingId(null);
     };
 
@@ -209,6 +213,12 @@ export default function MainChat({
     const submitMessage = async (query: string, currentMessages: Message[]) => {
         setIsLoading(true);
 
+        const conversationId = ensureConversationId();
+        if (!conversationId) {
+            setIsLoading(false);
+            return;
+        }
+
         const responseId = createMessageId();
         const userMessageId = currentMessages[currentMessages.length - 1]?.id ?? createMessageId();
         const newAiMsg: Message = { id: responseId, role: 'ai', content: '' };
@@ -245,7 +255,7 @@ export default function MainChat({
         } finally {
             setIsLoading(false);
             if (shouldCommit) {
-                await onMessagesCommitted(committedMessages);
+                await onMessagesCommitted(conversationId, committedMessages);
             }
         }
     };
@@ -298,13 +308,19 @@ export default function MainChat({
                             <div key={msg.id}>
                                 {msg.role === 'user' ? (
                                     <div className="flex justify-end mb-6 min-w-0">
-                                        <div className="max-w-[85%] sm:max-w-[75%] min-w-0 group">
+                                        <div
+                                            className={`min-w-0 group ${
+                                                editingId === msg.id
+                                                    ? 'w-full sm:w-[82%]'
+                                                    : 'max-w-[85%] sm:max-w-[75%]'
+                                            }`}
+                                        >
                                             {editingId === msg.id ? (
                                                 <div className="bg-white/60 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-3xl p-4 shadow-lg shadow-black/5 dark:shadow-black/25">
                                                     <textarea
                                                         value={editContent}
                                                         onChange={(e) => setEditContent(e.target.value)}
-                                                        className="w-full bg-transparent border-none outline-none resize-none text-[15px] text-gray-800 dark:text-gray-200 min-h-[80px]"
+                                                        className="block w-full min-h-[132px] bg-transparent border-none outline-none resize-y text-[15px] leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap [overflow-wrap:anywhere]"
                                                         autoFocus
                                                     />
                                                     <div className="flex justify-end gap-2 mt-2">
@@ -375,77 +391,73 @@ export default function MainChat({
                                                 <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
                                                     校园百事通 <ArrowDown01Icon size={14} />
                                                 </div>
-                                                <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
-                                                    <ReactMarkdown components={{ code: CodeBlock }}>
-                                                        {msg.content}
-                                                    </ReactMarkdown>
-                                                </div>
-                                                <div className="flex items-center gap-1 pt-1">
-                                                    <button className="flex h-8 w-8 items-center justify-center text-[#5b6ef5] dark:text-blue-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
-                                                        <ThumbsUpIcon size={16} />
-                                                    </button>
-                                                    <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
-                                                        <ThumbsDownIcon size={16} />
-                                                    </button>
-                                                    <div className="w-px h-4 bg-white/50 dark:bg-white/10 mx-1"></div>
-                                                    <button
-                                                        onClick={() => toggleSpeak(msg.id, msg.content)}
-                                                        className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
-                                                            speakingId === msg.id
-                                                                ? 'text-[#5b6ef5] bg-white/60 dark:bg-white/10'
-                                                                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10'
-                                                        }`}
-                                                        title="Speak"
-                                                    >
-                                                        {speakingId === msg.id ? (
-                                                            <VolumeMute01Icon size={16} />
-                                                        ) : (
-                                                            <VolumeUpIcon size={16} />
+                                                {isLoading && index === messages.length - 1 && !msg.content.trim() ? (
+                                                    <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
+                                                        <Refresh01Icon size={14} className="animate-spin" />
+                                                        {mode === 'thinking' ? t('thinking') : t('generating')}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
+                                                            <ReactMarkdown
+                                                                components={{ code: CodeBlock }}
+                                                                remarkPlugins={[remarkGfm]}
+                                                            >
+                                                                {msg.content}
+                                                            </ReactMarkdown>
+                                                        </div>
+                                                        {msg.content.trim() !== '' && (
+                                                            <div className="flex items-center gap-1 pt-1">
+                                                                <button className="flex h-8 w-8 items-center justify-center text-[#5b6ef5] dark:text-blue-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
+                                                                    <ThumbsUpIcon size={16} />
+                                                                </button>
+                                                                <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
+                                                                    <ThumbsDownIcon size={16} />
+                                                                </button>
+                                                                <div className="w-px h-4 bg-white/50 dark:bg-white/10 mx-1"></div>
+                                                                <button
+                                                                    onClick={() => toggleSpeak(msg.id, msg.content)}
+                                                                    className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
+                                                                        speakingId === msg.id
+                                                                            ? 'text-[#5b6ef5] bg-white/60 dark:bg-white/10'
+                                                                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10'
+                                                                    }`}
+                                                                    title="Speak"
+                                                                >
+                                                                    {speakingId === msg.id ? (
+                                                                        <VolumeMute01Icon size={16} />
+                                                                    ) : (
+                                                                        <VolumeUpIcon size={16} />
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => copyText(msg.content)}
+                                                                    className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
+                                                                    title="Copy"
+                                                                >
+                                                                    <Copy01Icon size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleRegenerate(index)}
+                                                                    disabled={!canWrite}
+                                                                    className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
+                                                                    title={t('regenerate')}
+                                                                >
+                                                                    <Refresh01Icon size={16} />
+                                                                </button>
+                                                                <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
+                                                                    <MoreVerticalIcon size={16} />
+                                                                </button>
+                                                            </div>
                                                         )}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => copyText(msg.content)}
-                                                        className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
-                                                        title="Copy"
-                                                    >
-                                                        <Copy01Icon size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRegenerate(index)}
-                                                        disabled={!canWrite}
-                                                        className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
-                                                        title={t('regenerate')}
-                                                    >
-                                                        <Refresh01Icon size={16} />
-                                                    </button>
-                                                    <button className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
-                                                        <MoreVerticalIcon size={16} />
-                                                    </button>
-                                                </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         ))
-                    )}
-
-                    {isLoading && (
-                        <>
-                            <div className="flex gap-3 sm:gap-4 pl-2 sm:pl-12">
-                                <div className="flex-1 space-y-3">
-                                    <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 py-4 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3">
-                                        <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
-                                            校园百事通 <ArrowDown01Icon size={14} />
-                                        </div>
-                                        <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
-                                            <Refresh01Icon size={14} className="animate-spin" />
-                                            {mode === 'thinking' ? t('thinking') : t('generating')}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
                     )}
                     <div ref={messagesEndRef} />
                 </div>

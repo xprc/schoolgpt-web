@@ -1,3 +1,28 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+.markdown-body table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.markdown-body th,
+.markdown-body td {
+    border: 1px solid rgb(148 163 184 / 0.42);
+    padding: 0.45rem 0.7rem;
+    vertical-align: top;
+}
+
+.markdown-body th {
+    background: rgb(255 255 255 / 0.38);
+    font-weight: 700;
+}
+
+.dark .markdown-body th {
+    background: rgb(255 255 255 / 0.08);
+}

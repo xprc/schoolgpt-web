@@ -52,5 +52,13 @@
   "copied": "已复制",
   "readOnlyConversation": "这是只读分享，对话内容不能修改。",
   "noConversations": "暂无对话",
-  "loadingConversation": "正在加载对话..."
+  "loadingConversation": "正在加载对话...",
+  "conversationOptions": "对话选项",
+  "pinConversation": "置顶",
+  "unpinConversation": "取消置顶",
+  "pinnedConversation": "已置顶",
+  "renameConversation": "重命名",
+  "renameInputPlaceholder": "对话名称",
+  "deleteConversation": "删除",
+  "deleteConversationConfirm": "删除“{{title}}”？"
 }
