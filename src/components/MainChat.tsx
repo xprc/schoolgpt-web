@@ -22,8 +22,11 @@ import { ApiAuthError, streamChat } from '../utils/apiChat';
 import type { Message } from '../utils/types';
 
 type MainChatProps = {
+    conversationId: string;
+    canWrite: boolean;
     messages: Message[];
     setMessages: Dispatch<SetStateAction<Message[]>>;
+    onMessagesCommitted: (messages: Message[]) => Promise<void>;
     onAuthExpired: () => void;
 };
 
@@ -73,14 +76,22 @@ type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
 
-let messageIdCounter = 0;
+const createMessageId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
 
-const createMessageId = (prefix: string) => {
-    messageIdCounter += 1;
-    return `${prefix}-${messageIdCounter}`;
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-export default function MainChat({ messages, setMessages, onAuthExpired }: MainChatProps) {
+export default function MainChat({
+    conversationId,
+    canWrite,
+    messages,
+    setMessages,
+    onMessagesCommitted,
+    onAuthExpired,
+}: MainChatProps) {
     const { t, i18n } = useTranslation();
     const [input, setInput] = useState('');
     const [mode, setMode] = useState<ChatMode>('auto');
@@ -148,9 +159,13 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
     };
 
     const saveEdit = (id: string) => {
-        setMessages((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, content: editContent } : m))
+        if (!canWrite) return;
+
+        const nextMessages = messages.map((m) =>
+            m.id === id ? { ...m, content: editContent } : m
         );
+        setMessages(nextMessages);
+        void onMessagesCommitted(nextMessages);
         setEditingId(null);
     };
 
@@ -194,48 +209,55 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
     const submitMessage = async (query: string, currentMessages: Message[]) => {
         setIsLoading(true);
 
-        const responseId = createMessageId('agent-response');
+        const responseId = createMessageId();
+        const userMessageId = currentMessages[currentMessages.length - 1]?.id ?? createMessageId();
         const newAiMsg: Message = { id: responseId, role: 'ai', content: '' };
-        setMessages([...currentMessages, newAiMsg]);
+        let committedMessages = [...currentMessages, newAiMsg];
+        let shouldCommit = true;
+        setMessages(committedMessages);
 
         try {
             let aiContent = '';
 
-            await streamChat(query, (parsedText) => {
+            await streamChat(query, conversationId, userMessageId, responseId, (parsedText) => {
                 aiContent += parsedText;
-                setMessages((prev) =>
-                    prev.map((m) => (m.id === responseId ? { ...m, content: aiContent } : m))
+                committedMessages = committedMessages.map((m) =>
+                    m.id === responseId ? { ...m, content: aiContent } : m
                 );
+                setMessages(committedMessages);
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            setMessages((prev) =>
-                prev.map((m) =>
-                    m.id === responseId
-                        ? {
-                            ...m,
-                            content: m.content + ` \n\n**[请求出错: ${message}]**`
-                        }
-                        : m
-                )
+            committedMessages = committedMessages.map((m) =>
+                m.id === responseId
+                    ? {
+                        ...m,
+                        content: m.content + ` \n\n**[请求出错: ${message}]**`,
+                    }
+                    : m
             );
+            setMessages(committedMessages);
 
             if (error instanceof ApiAuthError) {
+                shouldCommit = false;
                 onAuthExpired();
             }
         } finally {
             setIsLoading(false);
+            if (shouldCommit) {
+                await onMessagesCommitted(committedMessages);
+            }
         }
     };
 
     const handleSend = async () => {
         const query = input.trim();
-        if (!query || isLoading) return;
+        if (!query || isLoading || !canWrite) return;
 
         const newUserMsg: Message = {
-            id: createMessageId('user'),
+            id: createMessageId(),
             role: 'user',
-            content: query
+            content: query,
         };
         const updatedMessages = [...messages, newUserMsg];
         setMessages(updatedMessages);
@@ -244,7 +266,7 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
     };
 
     const handleRegenerate = async (index: number) => {
-        if (isLoading) return;
+        if (isLoading || !canWrite) return;
 
         let userMsgIndex = -1;
         for (let i = index - 1; i >= 0; i--) {
@@ -332,6 +354,7 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
                                                         </button>
                                                         <button
                                                             onClick={() => handleEdit(msg.id, msg.content)}
+                                                            disabled={!canWrite}
                                                             className="flex h-8 w-8 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
                                                             title="Edit"
                                                         >
@@ -389,6 +412,7 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
                                                     </button>
                                                     <button
                                                         onClick={() => handleRegenerate(index)}
+                                                        disabled={!canWrite}
                                                         className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
                                                         title={t('regenerate')}
                                                     >
@@ -412,7 +436,7 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
                                 <div className="flex-1 space-y-3">
                                     <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 py-4 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3">
                                         <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
-                                            CHAT A.I + <ArrowDown01Icon size={14} />
+                                            校园百事通 <ArrowDown01Icon size={14} />
                                         </div>
                                         <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
                                             <Refresh01Icon size={14} className="animate-spin" />
@@ -440,9 +464,15 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
                             }
                         }}
                         placeholder={t('placeholder')}
+                        disabled={!canWrite}
                         rows={1}
                         className="block min-h-[42px] w-full resize-none bg-transparent px-1 pb-1 pt-0 text-[15px] leading-6 text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-500"
                     />
+                    {!canWrite && (
+                        <div className="pb-2 text-sm text-gray-500 dark:text-gray-400">
+                            {t('readOnlyConversation')}
+                        </div>
+                    )}
                     <div className="flex items-center gap-2">
                         <label className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100 shrink-0 cursor-pointer">
                             <input
@@ -486,7 +516,7 @@ export default function MainChat({ messages, setMessages, onAuthExpired }: MainC
                         </button>
                         <button
                             onClick={handleSend}
-                            disabled={isLoading || !input.trim()}
+                            disabled={isLoading || !input.trim() || !canWrite}
                             className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-600 text-white shadow-sm transition-all hover:bg-gray-700 hover:scale-105 disabled:bg-gray-300 disabled:text-white disabled:cursor-not-allowed disabled:hover:scale-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:disabled:bg-white/20 dark:disabled:text-white/50 shrink-0"
                         >
                             <ArrowUp01Icon size={20} />

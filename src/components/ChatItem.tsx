@@ -4,11 +4,13 @@ type ChatItemProps = {
     text: string;
     active?: boolean;
     disabled?: boolean;
+    onClick?: () => void;
 };
 
-export default function ChatItem({ text, active, disabled }: ChatItemProps) {
+export default function ChatItem({ text, active, disabled, onClick }: ChatItemProps) {
     return (
         <div
+            onClick={disabled ? undefined : onClick}
             className={`group flex items-center px-4 py-1.5 rounded-r-full cursor-pointer transition-colors relative ${
                 active
                     ? 'bg-white/20 text-white font-medium'

@@ -88,7 +88,13 @@ const normalizePayload = (dataText: string): string => {
     }
 };
 
-export const streamChat = async (query: string, onChunk: ChatChunkHandler): Promise<void> => {
+export const streamChat = async (
+    query: string,
+    conversationId: string,
+    messageId: string,
+    responseId: string,
+    onChunk: ChatChunkHandler
+): Promise<void> => {
     const accessToken = getAccessToken();
     if (!accessToken) {
         throw new ApiAuthError('请先登录');
@@ -100,7 +106,12 @@ export const streamChat = async (query: string, onChunk: ChatChunkHandler): Prom
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({
+            query,
+            conversation_id: conversationId,
+            message_id: messageId,
+            response_id: responseId,
+        }),
     });
 
     if (!response.ok) {

@@ -43,5 +43,14 @@
   "signOut": "退出登录",
   "privacyPolicy": "隐私政策",
   "termsOfService": "服务条款",
-  "speechNotSupported": "当前浏览器不支持语音识别。"
+  "speechNotSupported": "当前浏览器不支持语音识别。",
+  "share": "分享",
+  "sharePrivate": "仅自己可见",
+  "shareRead": "链接可读",
+  "shareWrite": "链接可编辑",
+  "copyLink": "复制链接",
+  "copied": "已复制",
+  "readOnlyConversation": "这是只读分享，对话内容不能修改。",
+  "noConversations": "暂无对话",
+  "loadingConversation": "正在加载对话..."
 }

@@ -43,5 +43,14 @@
   "signOut": "Sign out",
   "privacyPolicy": "Privacy Policy",
   "termsOfService": "Terms of Service",
-  "speechNotSupported": "Speech recognition is not supported in this browser."
+  "speechNotSupported": "Speech recognition is not supported in this browser.",
+  "share": "Share",
+  "sharePrivate": "Private",
+  "shareRead": "Link can read",
+  "shareWrite": "Link can edit",
+  "copyLink": "Copy link",
+  "copied": "Copied",
+  "readOnlyConversation": "This is a read-only shared conversation.",
+  "noConversations": "No conversations yet",
+  "loadingConversation": "Loading conversation..."
 }
