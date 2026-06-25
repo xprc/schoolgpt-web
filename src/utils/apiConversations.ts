@@ -6,12 +6,17 @@ import type {
     ConversationShareScope,
     ConversationSummary,
     Message,
+    RagSource,
 } from './types';
 
 type ConversationMessageResponse = {
     id: string;
     role: 'user' | 'ai';
     content: string;
+    rag_sources?: Array<{
+        file_name: string;
+        confidence: number;
+    }>;
     created_at: string;
     updated_at: string;
 };
@@ -101,11 +106,30 @@ const ensureOk = async (response: Response): Promise<void> => {
     throw new ApiRequestError(response.status, await readErrorMessage(response));
 };
 
+const normalizeRagSources = (
+    sources: ConversationMessageResponse['rag_sources']
+): RagSource[] => {
+    if (!Array.isArray(sources)) {
+        return [];
+    }
+
+    return sources
+        .map((source) => {
+            const confidence = Number(source.confidence ?? 0);
+            return {
+                fileName: source.file_name,
+                confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
+            };
+        })
+        .filter((source) => source.fileName.trim().length > 0);
+};
+
 const normalizeMessage = (message: ConversationMessageResponse): Message => {
     return {
         id: message.id,
         role: message.role,
         content: message.content,
+        ragSources: normalizeRagSources(message.rag_sources),
         createdAt: message.created_at,
         updatedAt: message.updated_at,
     };
@@ -176,6 +200,10 @@ export const saveRemoteConversation = async (
                 id: message.id,
                 role: message.role,
                 content: message.content,
+                rag_sources: (message.ragSources ?? []).map((source) => ({
+                    file_name: source.fileName,
+                    confidence: source.confidence,
+                })),
             })),
         }),
     });

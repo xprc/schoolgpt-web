@@ -85,6 +85,10 @@ const createMessageId = () => {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+const formatConfidence = (confidence: number): string => {
+    return `${Math.round(Math.min(1, Math.max(0, confidence)) * 100)}%`;
+};
+
 export default function MainChat({
     canWrite,
     messages,
@@ -221,7 +225,7 @@ export default function MainChat({
 
         const responseId = createMessageId();
         const userMessageId = currentMessages[currentMessages.length - 1]?.id ?? createMessageId();
-        const newAiMsg: Message = { id: responseId, role: 'ai', content: '' };
+        const newAiMsg: Message = { id: responseId, role: 'ai', content: '', ragSources: [] };
         let committedMessages = [...currentMessages, newAiMsg];
         let shouldCommit = true;
         setMessages(committedMessages);
@@ -229,13 +233,25 @@ export default function MainChat({
         try {
             let aiContent = '';
 
-            await streamChat(query, conversationId, userMessageId, responseId, (parsedText) => {
-                aiContent += parsedText;
-                committedMessages = committedMessages.map((m) =>
-                    m.id === responseId ? { ...m, content: aiContent } : m
-                );
-                setMessages(committedMessages);
-            });
+            await streamChat(
+                query,
+                conversationId,
+                userMessageId,
+                responseId,
+                (parsedText) => {
+                    aiContent += parsedText;
+                    committedMessages = committedMessages.map((m) =>
+                        m.id === responseId ? { ...m, content: aiContent } : m
+                    );
+                    setMessages(committedMessages);
+                },
+                (ragSources) => {
+                    committedMessages = committedMessages.map((m) =>
+                        m.id === responseId ? { ...m, ragSources } : m
+                    );
+                    setMessages(committedMessages);
+                }
+            );
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             committedMessages = committedMessages.map((m) =>
@@ -406,6 +422,28 @@ export default function MainChat({
                                                                 {msg.content}
                                                             </ReactMarkdown>
                                                         </div>
+                                                        {(msg.ragSources?.length ?? 0) > 0 && (
+                                                            <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
+                                                                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                    RAG 来源
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {msg.ragSources?.map((source) => (
+                                                                        <span
+                                                                            key={source.fileName}
+                                                                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white/60 px-2.5 py-1 text-xs text-gray-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200"
+                                                                        >
+                                                                            <span className="max-w-[220px] truncate">
+                                                                                {source.fileName}
+                                                                            </span>
+                                                                            <span className="shrink-0 font-semibold text-[#5b6ef5] dark:text-blue-300">
+                                                                                {formatConfidence(source.confidence)}
+                                                                            </span>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                         {msg.content.trim() !== '' && (
                                                             <div className="flex items-center gap-1 pt-1">
                                                                 <button className="flex h-8 w-8 items-center justify-center text-[#5b6ef5] dark:text-blue-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">

@@ -1,7 +1,13 @@
+export type RagSource = {
+    fileName: string;
+    confidence: number;
+};
+
 export type Message = {
     id: string;
     role: 'user' | 'ai';
     content: string;
+    ragSources?: RagSource[];
     createdAt?: string;
     updatedAt?: string;
 };

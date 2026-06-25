@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import {
     Add01Icon,
     BotIcon,
@@ -15,25 +15,30 @@ import { ApiAuthError } from '../utils/apiChat';
 import {
     createAdminUser,
     deleteAdminConversation,
+    deleteRagFile,
     fetchAdminConversations,
     fetchAdminDashboard,
     fetchAdminUsers,
     fetchModelConfig,
     fetchModelProviderOptions,
+    fetchRagStatus,
+    rebuildRagDatabase,
     updateAdminConversationVisibility,
     updateAdminUser,
     updateAdminUserPassword,
     updateModelConfig,
+    uploadRagFiles,
     type AdminConversation,
     type AdminDashboard,
     type AdminUser,
     type AdminUserDraft,
     type ModelConfig,
     type ModelProviderOption,
+    type RagStatus,
     type UserType,
 } from '../utils/apiAdmin';
 
-type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model';
+type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model' | 'rag';
 
 type AdminCenterProps = {
     onClose: () => void;
@@ -61,6 +66,7 @@ const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
     { key: 'users', label: '用户设置', icon: Edit01Icon },
     { key: 'conversations', label: '对话管理', icon: Chat01Icon },
     { key: 'model', label: '模型配置', icon: BotIcon },
+    { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
 ];
 
 const formatDate = (value: string | null): string => {
@@ -86,6 +92,18 @@ const formatCount = (value: number): string => {
     return new Intl.NumberFormat('zh-CN').format(value);
 };
 
+const formatFileSize = (value: number): string => {
+    if (value < 1024) {
+        return `${value} B`;
+    }
+
+    if (value < 1024 * 1024) {
+        return `${(value / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(value / 1024 / 1024).toFixed(1)} MB`;
+};
+
 const modelDraftFromConfig = (config: ModelConfig): {
     provider: 'deepseek' | 'qwen';
     modelName: string;
@@ -109,6 +127,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     const [conversations, setConversations] = useState<AdminConversation[]>([]);
     const [modelConfig, setModelConfig] = useState<ModelConfig | null>(null);
     const [providerOptions, setProviderOptions] = useState<ModelProviderOption[]>([]);
+    const [ragStatus, setRagStatus] = useState<RagStatus | null>(null);
+    const [ragUploadFiles, setRagUploadFiles] = useState<File[]>([]);
+    const [ragFileInputKey, setRagFileInputKey] = useState(0);
     const [userDraft, setUserDraft] = useState<AdminUserDraft>(emptyUserDraft);
     const [editingUserId, setEditingUserId] = useState<number | null>(null);
     const [userSearch, setUserSearch] = useState('');
@@ -150,18 +171,21 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 nextConversations,
                 nextConfig,
                 nextProviderOptions,
+                nextRagStatus,
             ] = await Promise.all([
                 fetchAdminDashboard(),
                 fetchAdminUsers(),
                 fetchAdminConversations(),
                 fetchModelConfig(),
                 fetchModelProviderOptions(),
+                fetchRagStatus(),
             ]);
             setDashboard(nextDashboard);
             setUsers(nextUsers);
             setConversations(nextConversations);
             setModelConfig(nextConfig);
             setProviderOptions(nextProviderOptions);
+            setRagStatus(nextRagStatus);
             setModelDraft(modelDraftFromConfig(nextConfig));
         } catch (error: unknown) {
             handleError(error);
@@ -333,6 +357,69 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             const nextDashboard = await fetchAdminDashboard();
             setDashboard(nextDashboard);
             setStatusMessage('模型配置已保存');
+        } catch (error: unknown) {
+            handleError(error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRagFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        setRagUploadFiles(Array.from(event.target.files ?? []));
+    };
+
+    const handleRagUpload = async () => {
+        if (ragUploadFiles.length === 0) {
+            setErrorMessage('请选择要上传的知识库文件');
+            return;
+        }
+
+        setSaving(true);
+        setErrorMessage(null);
+        setStatusMessage(null);
+
+        try {
+            const nextStatus = await uploadRagFiles(ragUploadFiles);
+            setRagStatus(nextStatus);
+            setRagUploadFiles([]);
+            setRagFileInputKey((prev) => prev + 1);
+            setStatusMessage('知识库文件已上传');
+        } catch (error: unknown) {
+            handleError(error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRagRebuild = async () => {
+        setSaving(true);
+        setErrorMessage(null);
+        setStatusMessage(null);
+
+        try {
+            const nextStatus = await rebuildRagDatabase();
+            setRagStatus(nextStatus);
+            setStatusMessage('RAG 向量数据库已生成');
+        } catch (error: unknown) {
+            handleError(error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRagDelete = async (fileName: string) => {
+        if (!window.confirm(`确定删除知识库文件「${fileName}」？`)) {
+            return;
+        }
+
+        setSaving(true);
+        setErrorMessage(null);
+        setStatusMessage(null);
+
+        try {
+            const nextStatus = await deleteRagFile(fileName);
+            setRagStatus(nextStatus);
+            setStatusMessage('知识库文件已删除');
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -889,6 +976,178 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         );
     };
 
+    const renderRag = () => {
+        if (!ragStatus) {
+            return null;
+        }
+
+        const ragStats = [
+            { label: '知识文件', value: ragStatus.totalFiles },
+            { label: '已入库文件', value: ragStatus.indexedFiles },
+            { label: '向量数量', value: ragStatus.vectorCount },
+        ];
+        const uploadAccept = ragStatus.allowedFileTypes
+            .map((fileType) => fileType.startsWith('.') ? fileType : `.${fileType}`)
+            .join(',');
+
+        return (
+            <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-3">
+                    {ragStats.map((stat) => (
+                        <div
+                            key={stat.label}
+                            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                        >
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {stat.label}
+                            </div>
+                            <div className="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">
+                                {formatCount(stat.value)}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                    <div className="min-w-0 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151923]">
+                        <div className="flex flex-col gap-3 border-b border-gray-200 p-4 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
+                            <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                                知识文件
+                            </h3>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <input
+                                    key={ragFileInputKey}
+                                    type="file"
+                                    multiple
+                                    accept={uploadAccept}
+                                    onChange={handleRagFileChange}
+                                    className="max-w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-[#eef2ff] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#4a5ce0] hover:file:bg-[#e0e7ff] dark:text-gray-300 dark:file:bg-white/10 dark:file:text-white"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => void handleRagUpload()}
+                                    disabled={saving || ragUploadFiles.length === 0}
+                                    className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                >
+                                    <Add01Icon size={16} />
+                                    上传
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[780px] text-left text-sm">
+                                <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                                    <tr>
+                                        <th className="px-4 py-3">文件</th>
+                                        <th className="px-4 py-3">大小</th>
+                                        <th className="px-4 py-3">分片</th>
+                                        <th className="px-4 py-3">更新时间</th>
+                                        <th className="px-4 py-3">状态</th>
+                                        <th className="px-4 py-3 text-right">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                                    {ragStatus.files.length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan={6}
+                                                className="px-4 py-10 text-center text-gray-500 dark:text-gray-400"
+                                            >
+                                                暂无知识文件
+                                            </td>
+                                        </tr>
+                                    ) : ragStatus.files.map((file) => (
+                                        <tr key={file.name}>
+                                            <td className="px-4 py-3">
+                                                <div className="max-w-[320px] truncate font-medium text-gray-950 dark:text-white">
+                                                    {file.name}
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    {file.md5 ? file.md5.slice(0, 12) : '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                {formatFileSize(file.size)}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                {file.chunkCount}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                {formatDate(file.modifiedAt)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={file.indexed
+                                                    ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
+                                                    : 'rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'}
+                                                >
+                                                    {file.indexed ? '已入库' : '待生成'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleRagDelete(file.name)}
+                                                        disabled={saving}
+                                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-200 dark:hover:bg-red-500/15"
+                                                        title="删除"
+                                                    >
+                                                        <Delete02Icon size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
+                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                            向量库
+                        </h3>
+                        <dl className="mt-4 space-y-3 text-sm">
+                            <div>
+                                <dt className="text-gray-500 dark:text-gray-400">Collection</dt>
+                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                    {ragStatus.collectionName}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-gray-500 dark:text-gray-400">文件目录</dt>
+                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                    {ragStatus.dataPath}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-gray-500 dark:text-gray-400">数据库目录</dt>
+                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                    {ragStatus.persistDirectory}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-gray-500 dark:text-gray-400">文件类型</dt>
+                                <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                                    {ragStatus.allowedFileTypes.join(', ')}
+                                </dd>
+                            </div>
+                        </dl>
+                        <button
+                            type="button"
+                            onClick={() => void handleRagRebuild()}
+                            disabled={saving}
+                            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                            <Refresh01Icon size={16} className={saving ? 'animate-spin' : ''} />
+                            生成数据库
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderActiveTab = () => {
         if (loading) {
             return (
@@ -911,6 +1170,10 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             return renderConversations();
         }
 
+        if (activeTab === 'rag') {
+            return renderRag();
+        }
+
         return renderModelConfig();
     };
 
@@ -922,7 +1185,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         Admin 管理中心
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        数据、用户、对话和模型配置
+                        数据、用户、对话、模型和 RAG 配置
                     </p>
                 </div>
                 <div className="flex items-center gap-2">

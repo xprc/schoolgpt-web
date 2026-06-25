@@ -1,5 +1,6 @@
 import { apiBaseUrl } from './apiConfig';
 import { getAccessToken } from './auth';
+import type { RagSource } from './types';
 
 export class ApiAuthError extends Error {
     constructor(message: string) {
@@ -9,6 +10,7 @@ export class ApiAuthError extends Error {
 }
 
 type ChatChunkHandler = (content: string) => void;
+type RagSourcesHandler = (sources: RagSource[]) => void;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null;
@@ -88,12 +90,33 @@ const normalizePayload = (dataText: string): string => {
     }
 };
 
+const normalizeRagSources = (value: unknown): RagSource[] => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((source) => {
+            if (!isRecord(source) || typeof source.file_name !== 'string') {
+                return null;
+            }
+
+            const confidence = Number(source.confidence ?? 0);
+            return {
+                fileName: source.file_name,
+                confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
+            };
+        })
+        .filter((source): source is RagSource => source !== null);
+};
+
 export const streamChat = async (
     query: string,
     conversationId: string,
     messageId: string,
     responseId: string,
-    onChunk: ChatChunkHandler
+    onChunk: ChatChunkHandler,
+    onRagSources?: RagSourcesHandler
 ): Promise<void> => {
     const accessToken = getAccessToken();
     if (!accessToken) {
@@ -150,6 +173,20 @@ export const streamChat = async (
             if (dataText === null || dataText.trim() === '[DONE]') {
                 eventEndIndex = buffer.indexOf('\n\n');
                 continue;
+            }
+
+            try {
+                const dataObj: unknown = JSON.parse(dataText);
+                if (
+                    isRecord(dataObj)
+                    && dataObj.type === 'rag_sources'
+                ) {
+                    onRagSources?.(normalizeRagSources(dataObj.sources));
+                    eventEndIndex = buffer.indexOf('\n\n');
+                    continue;
+                }
+            } catch {
+                // Content chunks are often JSON strings; normalizePayload handles them below.
             }
 
             const parsedText = normalizePayload(dataText);

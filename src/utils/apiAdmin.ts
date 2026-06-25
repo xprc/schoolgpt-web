@@ -63,6 +63,26 @@ export type AdminDashboard = {
     activeModel: ModelConfig;
 };
 
+export type RagKnowledgeFile = {
+    name: string;
+    size: number;
+    modifiedAt: string;
+    md5: string;
+    indexed: boolean;
+    chunkCount: number;
+};
+
+export type RagStatus = {
+    collectionName: string;
+    dataPath: string;
+    persistDirectory: string;
+    allowedFileTypes: string[];
+    totalFiles: number;
+    indexedFiles: number;
+    vectorCount: number;
+    files: RagKnowledgeFile[];
+};
+
 type AdminUserResponse = {
     id: number;
     username: string;
@@ -119,6 +139,26 @@ type AdminDashboardResponse = {
     visible_conversations: number;
     total_messages: number;
     active_model: ModelConfigResponse;
+};
+
+type RagKnowledgeFileResponse = {
+    name: string;
+    size: number;
+    modified_at: string;
+    md5: string;
+    indexed: boolean;
+    chunk_count: number;
+};
+
+type RagStatusResponse = {
+    collection_name: string;
+    data_path: string;
+    persist_directory: string;
+    allowed_file_types: string[];
+    total_files: number;
+    indexed_files: number;
+    vector_count: number;
+    files: RagKnowledgeFileResponse[];
 };
 
 export type AdminUserDraft = {
@@ -254,6 +294,30 @@ const normalizeDashboard = (dashboard: AdminDashboardResponse): AdminDashboard =
         visibleConversations: dashboard.visible_conversations,
         totalMessages: dashboard.total_messages,
         activeModel: normalizeModelConfig(dashboard.active_model),
+    };
+};
+
+const normalizeRagFile = (file: RagKnowledgeFileResponse): RagKnowledgeFile => {
+    return {
+        name: file.name,
+        size: file.size,
+        modifiedAt: file.modified_at,
+        md5: file.md5,
+        indexed: file.indexed,
+        chunkCount: file.chunk_count,
+    };
+};
+
+const normalizeRagStatus = (status: RagStatusResponse): RagStatus => {
+    return {
+        collectionName: status.collection_name,
+        dataPath: status.data_path,
+        persistDirectory: status.persist_directory,
+        allowedFileTypes: status.allowed_file_types,
+        totalFiles: status.total_files,
+        indexedFiles: status.indexed_files,
+        vectorCount: status.vector_count,
+        files: status.files.map(normalizeRagFile),
     };
 };
 
@@ -403,4 +467,49 @@ export const updateModelConfig = async (
     await ensureOk(response);
 
     return normalizeModelConfig((await response.json()) as ModelConfigResponse);
+};
+
+export const fetchRagStatus = async (): Promise<RagStatus> => {
+    const response = await fetch(`${apiBaseUrl}/admin/rag`, {
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return normalizeRagStatus((await response.json()) as RagStatusResponse);
+};
+
+export const uploadRagFiles = async (files: File[]): Promise<RagStatus> => {
+    const formData = new FormData();
+    files.forEach((file) => {
+        formData.append('files', file);
+    });
+
+    const response = await fetch(`${apiBaseUrl}/admin/rag/files`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: formData,
+    });
+    await ensureOk(response);
+
+    return normalizeRagStatus((await response.json()) as RagStatusResponse);
+};
+
+export const deleteRagFile = async (fileName: string): Promise<RagStatus> => {
+    const response = await fetch(`${apiBaseUrl}/admin/rag/files/${encodeURIComponent(fileName)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return normalizeRagStatus((await response.json()) as RagStatusResponse);
+};
+
+export const rebuildRagDatabase = async (): Promise<RagStatus> => {
+    const response = await fetch(`${apiBaseUrl}/admin/rag/rebuild`, {
+        method: 'POST',
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return normalizeRagStatus((await response.json()) as RagStatusResponse);
 };
