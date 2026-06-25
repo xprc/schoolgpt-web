@@ -6,6 +6,7 @@ export type AuthUser = {
     email: string;
     avatarSha256: string;
     displayName: string;
+    userType: 'student' | 'teacher' | 'maintenance' | 'admin';
 };
 
 export type AuthSession = {
@@ -22,6 +23,7 @@ type LoginResponse = {
         email: string;
         avatar_sha256: string;
         display_name: string;
+        user_type: 'student' | 'teacher' | 'maintenance' | 'admin';
     };
 };
 
@@ -38,6 +40,7 @@ const normalizeUser = (user: LoginResponse['user']): AuthUser => {
         email: user.email,
         avatarSha256: user.avatar_sha256,
         displayName: user.display_name,
+        userType: user.user_type,
     };
 };
 
@@ -89,6 +92,11 @@ export const getStoredSession = (): AuthSession | null => {
                 email: user.email,
                 avatarSha256: typeof user.avatarSha256 === 'string' ? user.avatarSha256 : '',
                 displayName: user.displayName,
+                userType: typeof user.userType === 'string'
+                    ? user.userType as AuthUser['userType']
+                    : user.username === 'admin'
+                        ? 'admin'
+                        : 'student',
             },
         };
     } catch {

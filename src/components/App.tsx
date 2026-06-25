@@ -1,4 +1,6 @@
 import {
+    Suspense,
+    lazy,
     useCallback,
     useEffect,
     useMemo,
@@ -8,6 +10,7 @@ import {
     type SetStateAction,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import {
     Add01Icon,
     ArrowDown01Icon,
@@ -25,10 +28,6 @@ import {
     Tick02Icon,
 } from 'hugeicons-react';
 import ChatItem from './ChatItem';
-import LoginPage from './LoginPage';
-import MainChat from './MainChat';
-import ProfilePanel from './ProfilePanel';
-import SettingsPage from './SettingsPage';
 import { DARK_BG, LIGHT_BG, normalizeBackground } from '../utils/backgrounds';
 import {
     ApiRequestError,
@@ -49,6 +48,7 @@ import {
 } from '../utils/chatStore';
 import { getGravatarAvatarUrl, getGravatarFallbackAvatarUrl } from '../utils/gravatar';
 import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
+import { fetchSetupStatus } from '../utils/apiSetup';
 import type {
     Conversation,
     ConversationShareScope,
@@ -56,15 +56,33 @@ import type {
     Message,
 } from '../utils/types';
 
+const AdminCenter = lazy(() => import('./AdminCenter'));
+const FirstRunSetupPage = lazy(() => import('./FirstRunSetupPage'));
+const LoginPage = lazy(() => import('./LoginPage'));
+const MainChat = lazy(() => import('./MainChat'));
+const ProfilePanel = lazy(() => import('./ProfilePanel'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
+
 const defaultConversationTitle = '新对话';
 const draftConversationId = '';
-const chatRoutePattern =
-    /^\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const chatRouteIdPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const readConversationIdFromLocation = (): string | null => {
-    const match = window.location.pathname.match(chatRoutePattern);
-    return match?.[1] ?? null;
+const isConversationRouteId = (value: string | undefined): value is string => {
+    return Boolean(value && chatRouteIdPattern.test(value));
 };
+
+const PageLoadingFallback = () => (
+    <div className="relative z-10 flex min-h-screen w-full items-center justify-center text-sm text-white/75">
+        正在加载页面
+    </div>
+);
+
+const ContentLoadingFallback = () => (
+    <div className="flex min-h-0 flex-1 items-center justify-center pt-16 text-white/75">
+        正在加载页面
+    </div>
+);
 
 const createConversationId = (): string => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -176,14 +194,18 @@ const upsertSummary = (
 
 export default function App() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { conversationId } = useParams<{ conversationId: string }>();
+    const routeConversationId = isConversationRouteId(conversationId) ? conversationId : null;
+    const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
+    const [setupError, setSetupError] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [showAdminCenter, setShowAdminCenter] = useState(false);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
     const [showSharePanel, setShowSharePanel] = useState(false);
     const [shareCopied, setShareCopied] = useState(false);
     const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
-    const [routeConversationId, setRouteConversationId] = useState<string | null>(
-        () => readConversationIdFromLocation()
-    );
     const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
     const [conversationSummaries, setConversationSummaries] = useState<ConversationSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -205,37 +227,63 @@ export default function App() {
     const [resolvedDark, setResolvedDark] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-    const navigateToConversation = useCallback((conversationId: string, replace = false) => {
-        const nextPath = `/chat/${conversationId}`;
-        if (window.location.pathname !== nextPath) {
-            if (replace) {
-                window.history.replaceState({}, '', nextPath);
-            } else {
-                window.history.pushState({}, '', nextPath);
+    useEffect(() => {
+        let cancelled = false;
+
+        const checkSetupStatus = async () => {
+            try {
+                const isConfigured = await fetchSetupStatus();
+                if (cancelled) {
+                    return;
+                }
+
+                setSetupState(isConfigured ? 'ready' : 'required');
+                setSetupError(null);
+                if (!isConfigured) {
+                    clearAuthSession();
+                    setSession(null);
+                }
+            } catch (error: unknown) {
+                if (cancelled) {
+                    return;
+                }
+
+                setSetupState('checking');
+                setSetupError(error instanceof Error ? error.message : String(error));
             }
-        }
-        setRouteConversationId(conversationId);
-        setShowSettings(false);
-        setShowSharePanel(false);
-        setOpenConversationMenuId(null);
-        setRenamingConversationId(null);
+        };
+
+        void checkSetupStatus();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const navigateToDraftConversation = useCallback((replace = false) => {
-        const nextPath = '/';
-        if (window.location.pathname !== nextPath) {
-            if (replace) {
-                window.history.replaceState({}, '', nextPath);
-            } else {
-                window.history.pushState({}, '', nextPath);
-            }
-        }
-        setRouteConversationId(null);
+    const handleSetupComplete = useCallback(() => {
+        clearAuthSession();
+        setSession(null);
+        setSetupState('ready');
+        setSetupError(null);
+    }, []);
+
+    const navigateToConversation = useCallback((nextConversationId: string, replace = false) => {
+        navigate(`/chat/${nextConversationId}`, { replace });
         setShowSettings(false);
+        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
-    }, []);
+    }, [navigate]);
+
+    const navigateToDraftConversation = useCallback((replace = false) => {
+        navigate('/', { replace });
+        setShowSettings(false);
+        setShowAdminCenter(false);
+        setShowSharePanel(false);
+        setOpenConversationMenuId(null);
+        setRenamingConversationId(null);
+    }, [navigate]);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
         setSession(nextSession);
@@ -246,6 +294,7 @@ export default function App() {
         setSession(null);
         setShowProfilePanel(false);
         setShowSettings(false);
+        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
@@ -256,6 +305,11 @@ export default function App() {
     }, []);
 
     const refreshConversationList = useCallback(async () => {
+        if (setupState !== 'ready') {
+            setConversationSummaries([]);
+            return;
+        }
+
         if (!session) {
             setConversationSummaries([]);
             return;
@@ -281,7 +335,7 @@ export default function App() {
             const message = error instanceof Error ? error.message : String(error);
             setSyncError(message);
         }
-    }, [handleLogout, session]);
+    }, [handleLogout, session, setupState]);
 
     useEffect(() => {
         void refreshConversationList();
@@ -312,17 +366,18 @@ export default function App() {
     );
 
     useEffect(() => {
-        const handlePopState = () => {
-            setRouteConversationId(readConversationIdFromLocation());
-            setShowSettings(false);
-            setShowSharePanel(false);
-            setOpenConversationMenuId(null);
-            setRenamingConversationId(null);
-        };
+        if (conversationId && !isConversationRouteId(conversationId)) {
+            navigate('/', { replace: true });
+        }
+    }, [conversationId, navigate]);
 
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    useEffect(() => {
+        setShowSettings(false);
+        setShowAdminCenter(false);
+        setShowSharePanel(false);
+        setOpenConversationMenuId(null);
+        setRenamingConversationId(null);
+    }, [location.pathname]);
 
     useEffect(() => {
         if (!openConversationMenuId) {
@@ -338,7 +393,7 @@ export default function App() {
     }, [openConversationMenuId]);
 
     useEffect(() => {
-        if (!session || routeConversationId) {
+        if (setupState !== 'ready' || !session || routeConversationId) {
             return;
         }
 
@@ -348,10 +403,10 @@ export default function App() {
                 : createEmptyConversation(draftConversationId, session.user.id)
         );
         setShowSharePanel(false);
-    }, [routeConversationId, session]);
+    }, [routeConversationId, session, setupState]);
 
     useEffect(() => {
-        if (!session || !routeConversationId) {
+        if (setupState !== 'ready' || !session || !routeConversationId) {
             return;
         }
 
@@ -431,10 +486,16 @@ export default function App() {
         refreshConversationList,
         routeConversationId,
         session,
+        setupState,
     ]);
 
     useEffect(() => {
-        if (!session || !currentConversation || currentConversation.id === draftConversationId) {
+        if (
+            setupState !== 'ready' ||
+            !session ||
+            !currentConversation ||
+            currentConversation.id === draftConversationId
+        ) {
             return;
         }
 
@@ -443,7 +504,7 @@ export default function App() {
         }, 300);
 
         return () => window.clearTimeout(timer);
-    }, [currentConversation, session]);
+    }, [currentConversation, session, setupState]);
 
     const setMessages = useCallback<Dispatch<SetStateAction<Message[]>>>((value) => {
         setCurrentConversation((prev) => {
@@ -866,6 +927,7 @@ export default function App() {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === ',') {
                 e.preventDefault();
+                setShowAdminCenter(false);
                 setShowSettings((prev) => !prev);
             }
 
@@ -908,6 +970,34 @@ export default function App() {
         maskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)',
     };
 
+    if (setupState === 'checking') {
+        return (
+            <div
+                className="relative isolate flex min-h-screen w-full items-center justify-center overflow-hidden bg-cover bg-center font-sans text-white transition-all duration-500"
+                style={backgroundStyle}
+            >
+                <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
+                <div className="relative z-10 rounded-lg border border-white/25 bg-black/30 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
+                    {setupError ?? '正在检查首次运行状态'}
+                </div>
+            </div>
+        );
+    }
+
+    if (setupState === 'required') {
+        return (
+            <div
+                className="relative isolate min-h-screen w-full overflow-hidden bg-cover bg-center font-sans transition-all duration-500"
+                style={backgroundStyle}
+            >
+                <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
+                <Suspense fallback={<PageLoadingFallback />}>
+                    <FirstRunSetupPage onSetupComplete={handleSetupComplete} />
+                </Suspense>
+            </div>
+        );
+    }
+
     if (!session) {
         return (
             <div
@@ -915,7 +1005,9 @@ export default function App() {
                 style={backgroundStyle}
             >
                 <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
-                <LoginPage onLogin={handleLogin} />
+                <Suspense fallback={<PageLoadingFallback />}>
+                    <LoginPage onLogin={handleLogin} />
+                </Suspense>
             </div>
         );
     }
@@ -1020,15 +1112,29 @@ export default function App() {
                         <HelpCircleIcon size={20} />
                     </button>
                     <button
-                        onClick={() => setShowSettings(true)}
+                        onClick={() => {
+                            setShowAdminCenter(false);
+                            setShowSettings(true);
+                        }}
                         title="Shortcut: Cmd/Ctrl + ,"
                         className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
                     >
                         <Settings01Icon size={20} />
                     </button>
-                    <button className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block">
-                        <GridIcon size={20} />
-                    </button>
+                    {session.user.userType === 'admin' && (
+                        <button
+                            onClick={() => {
+                                setShowSettings(false);
+                                setShowAdminCenter(true);
+                                setShowSharePanel(false);
+                                setShowProfilePanel(false);
+                            }}
+                            title="Admin 管理中心"
+                            className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block"
+                        >
+                            <GridIcon size={20} />
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowProfilePanel((prev) => !prev)}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -1041,18 +1147,20 @@ export default function App() {
                         />
                     </button>
                     {showProfilePanel && (
-                        <ProfilePanel
-                            user={session.user}
-                            onClose={() => setShowProfilePanel(false)}
-                            onLogout={handleLogout}
-                        />
+                        <Suspense fallback={null}>
+                            <ProfilePanel
+                                user={session.user}
+                                onClose={() => setShowProfilePanel(false)}
+                                onLogout={handleLogout}
+                            />
+                        </Suspense>
                     )}
                 </div>
             </div>
 
             <div className="absolute inset-0 flex overflow-hidden z-10 sm:pl-0">
                 <div
-                    className={`absolute sm:relative z-20 h-full pt-16 bg-[#1a1a1a]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none flex flex-col shrink-0 transition-all duration-300 ${
+                    className={`absolute sm:relative z-20 h-full pt-16 bg-white/95 text-gray-800 backdrop-blur-md dark:bg-[#1a1a1a]/95 dark:text-white sm:bg-transparent sm:text-white sm:backdrop-blur-none dark:sm:bg-transparent flex flex-col shrink-0 transition-all duration-300 ${
                         isSidebarOpen
                             ? 'w-[240px] pr-4 opacity-100 translate-x-0'
                             : 'w-0 pr-0 opacity-0 -translate-x-full sm:translate-x-0 overflow-hidden'
@@ -1070,20 +1178,20 @@ export default function App() {
                     </div>
 
                     <div className="flex-1 overflow-y-auto mt-2 space-y-0.5 custom-scrollbar">
-                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full bg-white/20 text-white cursor-pointer font-medium">
+                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full bg-black/5 text-gray-950 cursor-pointer font-medium dark:bg-white/20 dark:text-white sm:bg-white/20 sm:text-white">
                             <div className="flex items-center gap-3">
                                 <Chat01Icon size={16} />
                                 <span className="text-sm">{t('chat')}</span>
                             </div>
                             <span className="text-xs font-bold">{conversationSummaries.length}</span>
                         </div>
-                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full hover:bg-white/10 text-white/80 hover:text-white cursor-pointer">
+                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white">
                             <div className="flex items-center gap-3">
                                 <Folder01Icon size={16} />
                                 <span className="text-sm">{t('files')}</span>
                             </div>
                         </div>
-                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full hover:bg-white/10 text-white/80 hover:text-white cursor-pointer">
+                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white">
                             <div className="flex items-center gap-3">
                                 <BotIcon size={16} />
                                 <span className="text-sm">{t('agent')}</span>
@@ -1094,16 +1202,16 @@ export default function App() {
                             className="mt-6 mb-2 px-4 flex items-center justify-between group cursor-pointer"
                             onClick={handleNewChat}
                         >
-                            <span className="text-sm font-medium text-white/90">
+                            <span className="text-sm font-medium text-gray-800 dark:text-white/90 sm:text-white/90">
                                 {t('chatHistory')}
                             </span>
                             <Add01Icon
                                 size={16}
-                                className="text-white/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity dark:text-white/70 sm:text-white/70"
                             />
                         </div>
                         {filteredConversationSummaries.length === 0 ? (
-                            <div className="px-4 py-2 text-sm text-white/55">
+                            <div className="px-4 py-2 text-sm text-gray-500 dark:text-white/55 sm:text-white/55">
                                 {syncError ?? t('noConversations')}
                             </div>
                         ) : (
@@ -1137,27 +1245,40 @@ export default function App() {
 
                 <div className="relative flex-1 overflow-hidden flex flex-col text-gray-800 dark:text-gray-200">
                     <div className="relative z-0 flex min-h-0 flex-1 flex-col">
-                        {showSettings ? (
+                        {showAdminCenter ? (
                             <div className="flex min-h-0 flex-1 pt-16">
-                                <SettingsPage
-                                    theme={theme}
-                                    setTheme={setTheme}
-                                    lightBg={lightBg}
-                                    setLightBg={setLightBg}
-                                    darkBg={darkBg}
-                                    setDarkBg={setDarkBg}
-                                    onClose={() => setShowSettings(false)}
-                                />
+                                <Suspense fallback={<ContentLoadingFallback />}>
+                                    <AdminCenter
+                                        onClose={() => setShowAdminCenter(false)}
+                                        onAuthExpired={handleLogout}
+                                    />
+                                </Suspense>
+                            </div>
+                        ) : showSettings ? (
+                            <div className="flex min-h-0 flex-1 pt-16">
+                                <Suspense fallback={<ContentLoadingFallback />}>
+                                    <SettingsPage
+                                        theme={theme}
+                                        setTheme={setTheme}
+                                        lightBg={lightBg}
+                                        setLightBg={setLightBg}
+                                        darkBg={darkBg}
+                                        setDarkBg={setDarkBg}
+                                        onClose={() => setShowSettings(false)}
+                                    />
+                                </Suspense>
                             </div>
                         ) : currentConversation ? (
-                            <MainChat
-                                canWrite={currentConversation.canWrite}
-                                messages={currentConversation.messages}
-                                setMessages={setMessages}
-                                ensureConversationId={ensureCurrentConversationId}
-                                onMessagesCommitted={handleMessagesCommitted}
-                                onAuthExpired={handleLogout}
-                            />
+                            <Suspense fallback={<ContentLoadingFallback />}>
+                                <MainChat
+                                    canWrite={currentConversation.canWrite}
+                                    messages={currentConversation.messages}
+                                    setMessages={setMessages}
+                                    ensureConversationId={ensureCurrentConversationId}
+                                    onMessagesCommitted={handleMessagesCommitted}
+                                    onAuthExpired={handleLogout}
+                                />
+                            </Suspense>
                         ) : (
                             <div className="flex min-h-0 flex-1 items-center justify-center pt-16 text-white/75">
                                 {t('loadingConversation')}

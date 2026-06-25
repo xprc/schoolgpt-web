@@ -87,16 +87,20 @@ export default function ChatItem({
                 onClick={handleContainerClick}
                 className={`group relative flex items-center rounded-r-full px-4 py-1.5 transition-colors ${
                     active
-                        ? 'bg-white/20 text-white font-medium'
+                        ? 'bg-black/5 text-gray-950 font-medium dark:bg-white/20 dark:text-white sm:bg-white/20 sm:text-white'
                         : disabled
-                            ? 'text-white/40 pointer-events-none'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white cursor-pointer'
+                            ? 'text-gray-400 pointer-events-none dark:text-white/40 sm:text-white/40'
+                            : 'text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white'
                 }`}
             >
                 <Chat01Icon
                     size={16}
                     className={`shrink-0 mr-3 ${
-                        active ? 'text-white' : disabled ? 'text-white/40' : 'text-white/70'
+                        active
+                            ? 'text-gray-950 dark:text-white sm:text-white'
+                            : disabled
+                                ? 'text-gray-400 dark:text-white/40 sm:text-white/40'
+                                : 'text-gray-500 dark:text-white/70 sm:text-white/70'
                     }`}
                 />
 
@@ -117,12 +121,12 @@ export default function ChatItem({
                             }}
                             onFocus={(event) => event.currentTarget.select()}
                             autoFocus
-                            className="min-w-0 flex-1 rounded-lg border border-white/25 bg-black/20 px-2 py-1 text-sm text-white outline-none placeholder:text-white/45 focus:border-white/55"
+                            className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-[#5b6ef5] dark:border-white/25 dark:bg-black/20 dark:text-white dark:placeholder:text-white/45 dark:focus:border-white/55 sm:border-white/25 sm:bg-black/20 sm:text-white sm:placeholder:text-white/45 sm:focus:border-white/55"
                             placeholder={t('renameInputPlaceholder')}
                         />
                         <button
                             type="submit"
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-black/5 hover:text-gray-950 dark:text-white/80 dark:hover:bg-white/15 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/15 sm:hover:text-white"
                             title={t('save')}
                         >
                             <Tick02Icon size={14} />
@@ -130,7 +134,7 @@ export default function ChatItem({
                         <button
                             type="button"
                             onClick={(event) => handleMenuAction(event, onRenameCancel)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/60 hover:bg-white/15 hover:text-white"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-black/5 hover:text-gray-900 dark:text-white/60 dark:hover:bg-white/15 dark:hover:text-white sm:text-white/60 sm:hover:bg-white/15 sm:hover:text-white"
                             title={t('cancel')}
                         >
                             <Cancel01Icon size={14} />
@@ -142,7 +146,7 @@ export default function ChatItem({
                         {pinned && (
                             <PinIcon
                                 size={13}
-                                className="mr-1 shrink-0 text-white/75"
+                                className="mr-1 shrink-0 text-gray-500 dark:text-white/75 sm:text-white/75"
                                 aria-label={t('pinnedConversation')}
                             />
                         )}
@@ -153,8 +157,8 @@ export default function ChatItem({
                                 onPointerDown={(event) => event.stopPropagation()}
                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
                                     menuOpen
-                                        ? 'bg-white/15 text-white'
-                                        : 'text-white/0 group-hover:text-white/75 hover:bg-white/15 hover:text-white'
+                                        ? 'bg-black/5 text-gray-900 dark:bg-white/15 dark:text-white sm:bg-white/15 sm:text-white'
+                                        : 'text-gray-500 group-hover:text-gray-600 hover:bg-black/5 hover:text-gray-900 dark:text-white/0 dark:group-hover:text-white/75 dark:hover:bg-white/15 dark:hover:text-white sm:text-white/0 sm:group-hover:text-white/75 sm:hover:bg-white/15 sm:hover:text-white'
                                 }`}
                                 title={t('conversationOptions')}
                             >
@@ -169,12 +173,12 @@ export default function ChatItem({
                 <div
                     onClick={stopPropagation}
                     onPointerDown={(event) => event.stopPropagation()}
-                    className="absolute right-2 top-9 z-50 w-48 rounded-2xl border border-white/15 bg-[#151923]/95 p-1.5 text-sm text-white shadow-2xl backdrop-blur-xl"
+                    className="absolute right-2 top-9 z-50 w-48 rounded-2xl border border-gray-200/80 bg-white/95 p-1.5 text-sm text-gray-800 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/15 dark:bg-[#151923]/95 dark:text-white dark:shadow-black/40"
                 >
                     <button
                         type="button"
                         onClick={(event) => handleMenuAction(event, onPinToggle)}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-950 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white"
                     >
                         {pinned ? <PinOffIcon size={16} /> : <PinIcon size={16} />}
                         <span>{pinned ? t('unpinConversation') : t('pinConversation')}</span>
@@ -182,7 +186,7 @@ export default function ChatItem({
                     <button
                         type="button"
                         onClick={(event) => handleMenuAction(event, onRenameStart)}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-950 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white"
                     >
                         <Edit01Icon size={16} />
                         <span>{t('renameConversation')}</span>
@@ -190,7 +194,7 @@ export default function ChatItem({
                     <button
                         type="button"
                         onClick={(event) => handleMenuAction(event, onDelete)}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-red-200 transition-colors hover:bg-red-500/15 hover:text-red-100"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-200 dark:hover:bg-red-500/15 dark:hover:text-red-100"
                     >
                         <Delete02Icon size={16} />
                         <span>{t('deleteConversation')}</span>
