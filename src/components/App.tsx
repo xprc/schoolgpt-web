@@ -10,7 +10,7 @@ import {
     type SetStateAction,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import {
     Add01Icon,
     ArrowDown01Icon,
@@ -198,12 +198,13 @@ export default function App() {
     const location = useLocation();
     const { conversationId } = useParams<{ conversationId: string }>();
     const routeConversationId = isConversationRouteId(conversationId) ? conversationId : null;
+    const isDraftRoute = location.pathname === '/';
+    const isSettingsRoute = location.pathname === '/settings';
+    const isAdminRoute = location.pathname === '/admin';
+    const isShareRoute = location.pathname.startsWith('/share/');
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
-    const [showSettings, setShowSettings] = useState(false);
-    const [showAdminCenter, setShowAdminCenter] = useState(false);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
-    const [showSharePanel, setShowSharePanel] = useState(false);
     const [shareCopied, setShareCopied] = useState(false);
     const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
     const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
@@ -269,21 +270,34 @@ export default function App() {
 
     const navigateToConversation = useCallback((nextConversationId: string, replace = false) => {
         navigate(`/chat/${nextConversationId}`, { replace });
-        setShowSettings(false);
-        setShowAdminCenter(false);
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [navigate]);
 
     const navigateToDraftConversation = useCallback((replace = false) => {
         navigate('/', { replace });
-        setShowSettings(false);
-        setShowAdminCenter(false);
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [navigate]);
+
+    const navigateToActiveConversation = useCallback((replace = false) => {
+        if (currentConversation && currentConversation.id !== draftConversationId) {
+            navigateToConversation(currentConversation.id, replace);
+            return;
+        }
+
+        if (routeConversationId) {
+            navigateToConversation(routeConversationId, replace);
+            return;
+        }
+
+        navigateToDraftConversation(replace);
+    }, [
+        currentConversation,
+        navigateToConversation,
+        navigateToDraftConversation,
+        routeConversationId,
+    ]);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
         setSession(nextSession);
@@ -293,9 +307,6 @@ export default function App() {
         clearAuthSession();
         setSession(null);
         setShowProfilePanel(false);
-        setShowSettings(false);
-        setShowAdminCenter(false);
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
         setCurrentConversation(null);
@@ -372,9 +383,6 @@ export default function App() {
     }, [conversationId, navigate]);
 
     useEffect(() => {
-        setShowSettings(false);
-        setShowAdminCenter(false);
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [location.pathname]);
@@ -393,7 +401,7 @@ export default function App() {
     }, [openConversationMenuId]);
 
     useEffect(() => {
-        if (setupState !== 'ready' || !session || routeConversationId) {
+        if (setupState !== 'ready' || !session || routeConversationId || !isDraftRoute) {
             return;
         }
 
@@ -402,8 +410,7 @@ export default function App() {
                 ? prev
                 : createEmptyConversation(draftConversationId, session.user.id)
         );
-        setShowSharePanel(false);
-    }, [routeConversationId, session, setupState]);
+    }, [isDraftRoute, routeConversationId, session, setupState]);
 
     useEffect(() => {
         if (setupState !== 'ready' || !session || !routeConversationId) {
@@ -867,8 +874,24 @@ export default function App() {
     );
 
     const shareUrl = currentConversation && currentConversation.id !== draftConversationId
-        ? `${window.location.origin}/chat/${currentConversation.id}`
+        ? `${window.location.origin}/share/${currentConversation.id}`
         : '';
+
+    const handleShareButtonClick = useCallback(() => {
+        if (!currentConversation || currentConversation.id === draftConversationId) {
+            return;
+        }
+
+        setShowProfilePanel(false);
+        setOpenConversationMenuId(null);
+
+        if (isShareRoute) {
+            navigateToConversation(currentConversation.id);
+            return;
+        }
+
+        navigate(`/share/${currentConversation.id}`);
+    }, [currentConversation, isShareRoute, navigate, navigateToConversation]);
 
     const handleCopyShareLink = useCallback(async () => {
         if (!shareUrl) return;
@@ -927,8 +950,12 @@ export default function App() {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === ',') {
                 e.preventDefault();
-                setShowAdminCenter(false);
-                setShowSettings((prev) => !prev);
+                if (isSettingsRoute) {
+                    navigateToActiveConversation();
+                } else {
+                    navigate('/settings');
+                    setShowProfilePanel(false);
+                }
             }
 
             if (e.altKey && e.key.toLowerCase() === 'n') {
@@ -939,7 +966,7 @@ export default function App() {
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [handleNewChat]);
+    }, [handleNewChat, isSettingsRoute, navigate, navigateToActiveConversation]);
 
     const filteredConversationSummaries = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -1012,6 +1039,10 @@ export default function App() {
         );
     }
 
+    if (isAdminRoute && session.user.userType !== 'admin') {
+        return <Navigate to="/" replace />;
+    }
+
     return (
         <div
             className="relative isolate flex h-screen w-full font-sans overflow-hidden bg-cover bg-center text-white transition-all duration-500"
@@ -1064,13 +1095,13 @@ export default function App() {
                     {currentConversation && currentConversation.id !== draftConversationId && (
                         <div className="relative">
                             <button
-                                onClick={() => setShowSharePanel((prev) => !prev)}
+                                onClick={handleShareButtonClick}
                                 className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
                                 title={t('share')}
                             >
                                 <Share01Icon size={20} />
                             </button>
-                            {showSharePanel && (
+                            {isShareRoute && (
                                 <div className="absolute right-0 top-11 w-72 rounded-2xl border border-white/20 bg-[#151923]/95 p-3 shadow-2xl backdrop-blur-xl">
                                     <div className="px-2 pb-2 text-sm font-semibold text-white">
                                         {t('share')}
@@ -1113,8 +1144,13 @@ export default function App() {
                     </button>
                     <button
                         onClick={() => {
-                            setShowAdminCenter(false);
-                            setShowSettings(true);
+                            setShowProfilePanel(false);
+                            if (isSettingsRoute) {
+                                navigateToActiveConversation();
+                                return;
+                            }
+
+                            navigate('/settings');
                         }}
                         title="Shortcut: Cmd/Ctrl + ,"
                         className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
@@ -1124,10 +1160,13 @@ export default function App() {
                     {session.user.userType === 'admin' && (
                         <button
                             onClick={() => {
-                                setShowSettings(false);
-                                setShowAdminCenter(true);
-                                setShowSharePanel(false);
                                 setShowProfilePanel(false);
+                                if (isAdminRoute) {
+                                    navigateToActiveConversation();
+                                    return;
+                                }
+
+                                navigate('/admin');
                             }}
                             title="Admin 管理中心"
                             className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block"
@@ -1245,16 +1284,16 @@ export default function App() {
 
                 <div className="relative flex-1 overflow-hidden flex flex-col text-gray-800 dark:text-gray-200">
                     <div className="relative z-0 flex min-h-0 flex-1 flex-col">
-                        {showAdminCenter ? (
+                        {isAdminRoute && session.user.userType === 'admin' ? (
                             <div className="flex min-h-0 flex-1 pt-16">
                                 <Suspense fallback={<ContentLoadingFallback />}>
                                     <AdminCenter
-                                        onClose={() => setShowAdminCenter(false)}
+                                        onClose={() => navigateToActiveConversation()}
                                         onAuthExpired={handleLogout}
                                     />
                                 </Suspense>
                             </div>
-                        ) : showSettings ? (
+                        ) : isSettingsRoute ? (
                             <div className="flex min-h-0 flex-1 pt-16">
                                 <Suspense fallback={<ContentLoadingFallback />}>
                                     <SettingsPage
@@ -1264,7 +1303,7 @@ export default function App() {
                                         setLightBg={setLightBg}
                                         darkBg={darkBg}
                                         setDarkBg={setDarkBg}
-                                        onClose={() => setShowSettings(false)}
+                                        onClose={() => navigateToActiveConversation()}
                                     />
                                 </Suspense>
                             </div>

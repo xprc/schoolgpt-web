@@ -5,11 +5,17 @@ const loadAppRoute = async () => {
     return { Component: App };
 };
 
-const NotFoundRedirect = () => <Navigate to="/" replace />;
-
 export const router = createBrowserRouter([
     {
         path: '/',
+        lazy: loadAppRoute,
+    },
+    {
+        path: '/settings',
+        lazy: loadAppRoute,
+    },
+    {
+        path: '/admin',
         lazy: loadAppRoute,
     },
     {
@@ -17,7 +23,11 @@ export const router = createBrowserRouter([
         lazy: loadAppRoute,
     },
     {
+        path: '/share/:conversationId',
+        lazy: loadAppRoute,
+    },
+    {
         path: '*',
-        Component: NotFoundRedirect,
+        element: <Navigate to="/" replace />,
     },
 ]);
