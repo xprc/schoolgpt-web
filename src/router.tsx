@@ -34,7 +34,11 @@ export const router = createBrowserRouter([
         lazy: loadAppRoute,
     },
     {
+        path: '/share/:conversationId',
+        lazy: loadAppRoute,
+    },
+    {
         path: '*',
-        Component: NotFoundRedirect,
+        element: <Navigate to="/" replace />,
     },
 ]);

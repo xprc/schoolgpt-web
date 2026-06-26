@@ -10,7 +10,7 @@ import {
     type SetStateAction,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import {
     Add01Icon,
     ArrowDown01Icon,
@@ -201,7 +201,6 @@ export default function App() {
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
-    const [showSharePanel, setShowSharePanel] = useState(false);
     const [shareCopied, setShareCopied] = useState(false);
     const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
     const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
@@ -294,6 +293,25 @@ export default function App() {
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [navigate]);
+
+    const navigateToActiveConversation = useCallback((replace = false) => {
+        if (currentConversation && currentConversation.id !== draftConversationId) {
+            navigateToConversation(currentConversation.id, replace);
+            return;
+        }
+
+        if (routeConversationId) {
+            navigateToConversation(routeConversationId, replace);
+            return;
+        }
+
+        navigateToDraftConversation(replace);
+    }, [
+        currentConversation,
+        navigateToConversation,
+        navigateToDraftConversation,
+        routeConversationId,
+    ]);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
         setSession(nextSession);
@@ -474,7 +492,7 @@ export default function App() {
     }, [openConversationMenuId]);
 
     useEffect(() => {
-        if (setupState !== 'ready' || !session || routeConversationId) {
+        if (setupState !== 'ready' || !session || routeConversationId || !isDraftRoute) {
             return;
         }
 
@@ -483,8 +501,7 @@ export default function App() {
                 ? prev
                 : createEmptyConversation(draftConversationId, session.user.id)
         );
-        setShowSharePanel(false);
-    }, [routeConversationId, session, setupState]);
+    }, [isDraftRoute, routeConversationId, session, setupState]);
 
     useEffect(() => {
         if (setupState !== 'ready' || !session || !routeConversationId) {
@@ -944,7 +961,7 @@ export default function App() {
     );
 
     const shareUrl = currentConversation && currentConversation.id !== draftConversationId
-        ? `${window.location.origin}/chat/${currentConversation.id}`
+        ? `${window.location.origin}/share/${currentConversation.id}`
         : '';
 
     const handleCopyShareLink = useCallback(async () => {
@@ -1053,6 +1070,10 @@ export default function App() {
         );
     }
 
+    if (isAdminRoute && session.user.userType !== 'admin') {
+        return <Navigate to="/" replace />;
+    }
+
     return (
         <div
             className="relative isolate flex h-screen w-full font-sans overflow-hidden bg-cover bg-center text-white transition-all duration-500"
@@ -1115,13 +1136,13 @@ export default function App() {
                     {currentConversation && currentConversation.id !== draftConversationId && (
                         <div className="relative">
                             <button
-                                onClick={() => setShowSharePanel((prev) => !prev)}
+                                onClick={handleShareButtonClick}
                                 className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
                                 title={t('share')}
                             >
                                 <Share01Icon size={20} />
                             </button>
-                            {showSharePanel && (
+                            {isShareRoute && (
                                 <div className="absolute right-0 top-11 w-72 rounded-2xl border border-white/20 bg-[#151923]/95 p-3 shadow-2xl backdrop-blur-xl">
                                     <div className="px-2 pb-2 text-sm font-semibold text-white">
                                         {t('share')}
