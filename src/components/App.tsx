@@ -15,6 +15,7 @@ import {
     Add01Icon,
     ArrowDown01Icon,
     BotIcon,
+    Cancel01Icon,
     Chat01Icon,
     Copy01Icon,
     Edit01Icon,
@@ -28,7 +29,6 @@ import {
     Tick02Icon,
 } from 'hugeicons-react';
 import ChatItem from './ChatItem';
-import { DARK_BG, LIGHT_BG, normalizeBackground } from '../utils/backgrounds';
 import {
     ApiRequestError,
     deleteRemoteConversation,
@@ -49,6 +49,7 @@ import {
 import { getGravatarAvatarUrl, getGravatarFallbackAvatarUrl } from '../utils/gravatar';
 import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
 import { fetchSetupStatus } from '../utils/apiSetup';
+import { useAppearanceSettings } from '../hooks/useAppearanceSettings';
 import type {
     Conversation,
     ConversationShareScope,
@@ -56,12 +57,10 @@ import type {
     Message,
 } from '../utils/types';
 
-const AdminCenter = lazy(() => import('./AdminCenter'));
 const FirstRunSetupPage = lazy(() => import('./FirstRunSetupPage'));
 const LoginPage = lazy(() => import('./LoginPage'));
 const MainChat = lazy(() => import('./MainChat'));
 const ProfilePanel = lazy(() => import('./ProfilePanel'));
-const SettingsPage = lazy(() => import('./SettingsPage'));
 
 const defaultConversationTitle = '新对话';
 const draftConversationId = '';
@@ -198,10 +197,9 @@ export default function App() {
     const location = useLocation();
     const { conversationId } = useParams<{ conversationId: string }>();
     const routeConversationId = isConversationRouteId(conversationId) ? conversationId : null;
+    const { backgroundStyle, topBlendStyle } = useAppearanceSettings();
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
-    const [showSettings, setShowSettings] = useState(false);
-    const [showAdminCenter, setShowAdminCenter] = useState(false);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
     const [showSharePanel, setShowSharePanel] = useState(false);
     const [shareCopied, setShareCopied] = useState(false);
@@ -209,23 +207,39 @@ export default function App() {
     const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
     const [conversationSummaries, setConversationSummaries] = useState<ConversationSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+    const [conversationSearchResults, setConversationSearchResults] = useState<ConversationSummary[] | null>(null);
+    const [isConversationSearchLoading, setIsConversationSearchLoading] = useState(false);
+    const [conversationSearchError, setConversationSearchError] = useState<string | null>(null);
     const [syncError, setSyncError] = useState<string | null>(null);
     const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null);
     const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
     const [renameDraft, setRenameDraft] = useState('');
     const clientCreatedConversationIdsRef = useRef(new Set<string>());
     const [avatarUrl, setAvatarUrl] = useState(() => getGravatarFallbackAvatarUrl(''));
-    const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(
-        () => (localStorage.getItem('theme') as 'system' | 'light' | 'dark') || 'system'
-    );
-    const [lightBg, setLightBg] = useState(
-        () => normalizeBackground(localStorage.getItem('lightBg'), LIGHT_BG[0])
-    );
-    const [darkBg, setDarkBg] = useState(
-        () => normalizeBackground(localStorage.getItem('darkBg'), DARK_BG[0])
-    );
-    const [resolvedDark, setResolvedDark] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+    const upsertConversationSummaryState = useCallback((summary: ConversationSummary) => {
+        setConversationSummaries((prev) => upsertSummary(prev, summary));
+        setConversationSearchResults((prev) => {
+            if (prev === null || !prev.some((existingSummary) => existingSummary.id === summary.id)) {
+                return prev;
+            }
+
+            return upsertSummary(prev, summary);
+        });
+    }, []);
+
+    const removeConversationSummaryState = useCallback((conversationId: string) => {
+        setConversationSummaries((prev) =>
+            prev.filter((summary) => summary.id !== conversationId)
+        );
+        setConversationSearchResults((prev) =>
+            prev === null
+                ? prev
+                : prev.filter((summary) => summary.id !== conversationId)
+        );
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -269,8 +283,6 @@ export default function App() {
 
     const navigateToConversation = useCallback((nextConversationId: string, replace = false) => {
         navigate(`/chat/${nextConversationId}`, { replace });
-        setShowSettings(false);
-        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
@@ -278,8 +290,6 @@ export default function App() {
 
     const navigateToDraftConversation = useCallback((replace = false) => {
         navigate('/', { replace });
-        setShowSettings(false);
-        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
@@ -293,13 +303,16 @@ export default function App() {
         clearAuthSession();
         setSession(null);
         setShowProfilePanel(false);
-        setShowSettings(false);
-        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
         setCurrentConversation(null);
         setConversationSummaries([]);
+        setConversationSearchResults(null);
+        setConversationSearchError(null);
+        setIsConversationSearchLoading(false);
+        setSearchQuery('');
+        setDebouncedSearchQuery('');
         setSyncError(null);
         clientCreatedConversationIdsRef.current.clear();
     }, []);
@@ -307,11 +320,17 @@ export default function App() {
     const refreshConversationList = useCallback(async () => {
         if (setupState !== 'ready') {
             setConversationSummaries([]);
+            setConversationSearchResults(null);
+            setConversationSearchError(null);
+            setIsConversationSearchLoading(false);
             return;
         }
 
         if (!session) {
             setConversationSummaries([]);
+            setConversationSearchResults(null);
+            setConversationSearchError(null);
+            setIsConversationSearchLoading(false);
             return;
         }
 
@@ -340,6 +359,70 @@ export default function App() {
     useEffect(() => {
         void refreshConversationList();
     }, [refreshConversationList]);
+
+    useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 250);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [searchQuery]);
+
+    useEffect(() => {
+        const query = debouncedSearchQuery.trim();
+        if (!query) {
+            setConversationSearchResults(null);
+            setConversationSearchError(null);
+            setIsConversationSearchLoading(false);
+            return;
+        }
+
+        if (setupState !== 'ready' || !session) {
+            setConversationSearchResults(null);
+            setIsConversationSearchLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsConversationSearchLoading(true);
+        setConversationSearchError(null);
+
+        const searchConversations = async () => {
+            try {
+                const remoteSummaries = await fetchRemoteConversationList(query);
+                const visibleRemoteSummaries = sortConversationSummaries(
+                    remoteSummaries.filter((summary) => summary.isVisible !== false)
+                );
+
+                if (!cancelled) {
+                    setConversationSearchResults(visibleRemoteSummaries);
+                }
+            } catch (error: unknown) {
+                if (error instanceof ApiAuthError) {
+                    handleLogout();
+                    return;
+                }
+
+                if (!cancelled) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    setConversationSearchError(message);
+                    setConversationSearchResults([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsConversationSearchLoading(false);
+                }
+            }
+        };
+
+        void searchConversations();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [debouncedSearchQuery, handleLogout, session, setupState]);
 
     useEffect(() => {
         if (!session) {
@@ -372,8 +455,6 @@ export default function App() {
     }, [conversationId, navigate]);
 
     useEffect(() => {
-        setShowSettings(false);
-        setShowAdminCenter(false);
         setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
@@ -443,9 +524,7 @@ export default function App() {
 
                 if (!cancelled) {
                     setCurrentConversation(nextConversation);
-                    setConversationSummaries((prev) =>
-                        upsertSummary(prev, toSummary(nextConversation))
-                    );
+                    upsertConversationSummaryState(toSummary(nextConversation));
                 }
                 await saveLocalConversation(session.user.id, nextConversation);
             } catch (error: unknown) {
@@ -457,9 +536,7 @@ export default function App() {
                 if (error instanceof ApiRequestError && error.status === 404) {
                     await deleteLocalConversation(session.user.id, routeConversationId);
                     if (!cancelled) {
-                        setConversationSummaries((prev) =>
-                            prev.filter((summary) => summary.id !== routeConversationId)
-                        );
+                        removeConversationSummaryState(routeConversationId);
                         setCurrentConversation(
                             createEmptyConversation(draftConversationId, session.user.id)
                         );
@@ -484,9 +561,11 @@ export default function App() {
         handleLogout,
         navigateToDraftConversation,
         refreshConversationList,
+        removeConversationSummaryState,
         routeConversationId,
         session,
         setupState,
+        upsertConversationSummaryState,
     ]);
 
     useEffect(() => {
@@ -556,7 +635,7 @@ export default function App() {
                 setCurrentConversation((prev) =>
                     prev?.id === savedConversation.id ? savedConversation : prev
                 );
-                setConversationSummaries((prev) => upsertSummary(prev, toSummary(savedConversation)));
+                upsertConversationSummaryState(toSummary(savedConversation));
                 await saveLocalConversation(session.user.id, savedConversation);
                 setSyncError(null);
             } catch (error: unknown) {
@@ -569,7 +648,7 @@ export default function App() {
                 setSyncError(message);
             }
         },
-        [currentConversation, handleLogout, session]
+        [currentConversation, handleLogout, session, upsertConversationSummaryState]
     );
 
     const saveConversationMetadataLocally = useCallback(
@@ -612,10 +691,10 @@ export default function App() {
             setCurrentConversation((prev) =>
                 prev?.id === conversation.id ? conversation : prev
             );
-            setConversationSummaries((prev) => upsertSummary(prev, toSummary(conversation)));
+            upsertConversationSummaryState(toSummary(conversation));
             await saveLocalConversation(session.user.id, conversation);
         },
-        [session]
+        [session, upsertConversationSummaryState]
     );
 
     const removeMissingRemoteConversation = useCallback(
@@ -625,9 +704,7 @@ export default function App() {
             }
 
             await deleteLocalConversation(session.user.id, conversationId);
-            setConversationSummaries((prev) =>
-                prev.filter((summary) => summary.id !== conversationId)
-            );
+            removeConversationSummaryState(conversationId);
 
             if (currentConversation?.id === conversationId || routeConversationId === conversationId) {
                 setCurrentConversation(createEmptyConversation(draftConversationId, session.user.id));
@@ -637,6 +714,7 @@ export default function App() {
         [
             currentConversation?.id,
             navigateToDraftConversation,
+            removeConversationSummaryState,
             routeConversationId,
             session,
         ]
@@ -667,7 +745,7 @@ export default function App() {
                     shareScope
                 );
                 setCurrentConversation(savedConversation);
-                setConversationSummaries((prev) => upsertSummary(prev, toSummary(savedConversation)));
+                upsertConversationSummaryState(toSummary(savedConversation));
                 await saveLocalConversation(session.user.id, savedConversation);
                 setSyncError(null);
             } catch (error: unknown) {
@@ -680,7 +758,7 @@ export default function App() {
                 setSyncError(message);
             }
         },
-        [currentConversation, handleLogout, session]
+        [currentConversation, handleLogout, session, upsertConversationSummaryState]
     );
 
     const handleStartRenameConversation = useCallback(
@@ -826,9 +904,7 @@ export default function App() {
 
             setOpenConversationMenuId(null);
             setRenamingConversationId(null);
-            setConversationSummaries((prev) =>
-                prev.filter((conversation) => conversation.id !== summary.id)
-            );
+            removeConversationSummaryState(summary.id);
             await deleteLocalConversation(session.user.id, summary.id);
 
             if (currentConversation?.id === summary.id || routeConversationId === summary.id) {
@@ -859,6 +935,7 @@ export default function App() {
             currentConversation?.id,
             handleLogout,
             navigateToDraftConversation,
+            removeConversationSummaryState,
             refreshConversationList,
             routeConversationId,
             session,
@@ -879,56 +956,10 @@ export default function App() {
     }, [shareUrl]);
 
     useEffect(() => {
-        localStorage.setItem('lightBg', lightBg);
-    }, [lightBg]);
-
-    useEffect(() => {
-        localStorage.setItem('darkBg', darkBg);
-    }, [darkBg]);
-
-    useEffect(() => {
-        localStorage.setItem('theme', theme);
-
-        const applyTheme = () => {
-            const root = document.documentElement;
-
-            if (theme === 'dark') {
-                root.classList.add('dark');
-                setResolvedDark(true);
-                return;
-            }
-
-            if (theme === 'light') {
-                root.classList.remove('dark');
-                setResolvedDark(false);
-                return;
-            }
-
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                root.classList.add('dark');
-                setResolvedDark(true);
-            } else {
-                root.classList.remove('dark');
-                setResolvedDark(false);
-            }
-        };
-
-        applyTheme();
-
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            const handler = () => applyTheme();
-            mediaQuery.addEventListener('change', handler);
-            return () => mediaQuery.removeEventListener('change', handler);
-        }
-    }, [theme]);
-
-    useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === ',') {
                 e.preventDefault();
-                setShowAdminCenter(false);
-                setShowSettings((prev) => !prev);
+                navigate('/settings');
             }
 
             if (e.altKey && e.key.toLowerCase() === 'n') {
@@ -939,36 +970,46 @@ export default function App() {
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [handleNewChat]);
+    }, [handleNewChat, navigate]);
 
+    const activeSearchQuery = searchQuery.trim();
     const filteredConversationSummaries = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
+        const visibleSummaries = conversationSummaries.filter(
+            (summary) => summary.isVisible !== false
+        );
+        const query = activeSearchQuery.toLowerCase();
         if (!query) {
-            return conversationSummaries.filter((summary) => summary.isVisible !== false);
+            return visibleSummaries;
         }
 
-        return conversationSummaries.filter((summary) =>
-            summary.isVisible !== false && summary.title.toLowerCase().includes(query)
+        if (
+            conversationSearchResults !== null
+            && debouncedSearchQuery.trim().toLowerCase() === query
+        ) {
+            return conversationSearchResults;
+        }
+
+        return visibleSummaries.filter((summary) =>
+            summary.title.toLowerCase().includes(query)
         );
-    }, [conversationSummaries, searchQuery]);
+    }, [
+        activeSearchQuery,
+        conversationSearchResults,
+        conversationSummaries,
+        debouncedSearchQuery,
+    ]);
+
+    const conversationListEmptyMessage = activeSearchQuery
+        ? isConversationSearchLoading
+            ? t('searchingConversations')
+            : conversationSearchError ?? t('noSearchResults')
+        : syncError ?? t('noConversations');
 
     const shareOptions: Array<{ label: string; scope: ConversationShareScope }> = [
         { label: t('sharePrivate'), scope: 'private' },
         { label: t('shareRead'), scope: 'link_read' },
         { label: t('shareWrite'), scope: 'link_write' },
     ];
-
-    const bgToUse = resolvedDark ? darkBg : lightBg;
-    const backgroundStyle = {
-        backgroundImage: `url("${bgToUse}")`,
-    };
-    const topBlendStyle = {
-        background: 'linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0))',
-        WebkitBackdropFilter: 'blur(12px)',
-        backdropFilter: 'blur(12px)',
-        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)',
-        maskImage: 'linear-gradient(to bottom, black 0%, black 44%, rgba(0, 0, 0, 0.72) 75%, transparent 100%)',
-    };
 
     if (setupState === 'checking') {
         return (
@@ -1048,6 +1089,16 @@ export default function App() {
                             placeholder={t('searchChats')}
                             className="bg-transparent border-none outline-none text-white placeholder-white/70 w-full text-sm sm:text-base"
                         />
+                        {activeSearchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+                                title={t('clearSearch')}
+                            >
+                                <Cancel01Icon size={15} />
+                            </button>
+                        )}
                         <Settings01Icon
                             size={18}
                             className="text-white/70 ml-2 sm:ml-3 cursor-pointer hidden sm:block"
@@ -1112,9 +1163,11 @@ export default function App() {
                         <HelpCircleIcon size={20} />
                     </button>
                     <button
+                        type="button"
                         onClick={() => {
-                            setShowAdminCenter(false);
-                            setShowSettings(true);
+                            setShowSharePanel(false);
+                            setShowProfilePanel(false);
+                            navigate('/settings');
                         }}
                         title="Shortcut: Cmd/Ctrl + ,"
                         className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
@@ -1123,11 +1176,11 @@ export default function App() {
                     </button>
                     {session.user.userType === 'admin' && (
                         <button
+                            type="button"
                             onClick={() => {
-                                setShowSettings(false);
-                                setShowAdminCenter(true);
                                 setShowSharePanel(false);
                                 setShowProfilePanel(false);
+                                navigate('/admin');
                             }}
                             title="Admin 管理中心"
                             className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block"
@@ -1159,6 +1212,16 @@ export default function App() {
             </div>
 
             <div className="absolute inset-0 flex overflow-hidden z-10 sm:pl-0">
+                <button
+                    type="button"
+                    aria-label="Close sidebar"
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`absolute inset-0 z-10 bg-black/15 transition-opacity sm:hidden ${
+                        isSidebarOpen
+                            ? 'opacity-100'
+                            : 'pointer-events-none opacity-0'
+                    }`}
+                />
                 <div
                     className={`absolute sm:relative z-20 h-full pt-16 bg-white/95 text-gray-800 backdrop-blur-md dark:bg-[#1a1a1a]/95 dark:text-white sm:bg-transparent sm:text-white sm:backdrop-blur-none dark:sm:bg-transparent flex flex-col shrink-0 transition-all duration-300 ${
                         isSidebarOpen
@@ -1212,7 +1275,7 @@ export default function App() {
                         </div>
                         {filteredConversationSummaries.length === 0 ? (
                             <div className="px-4 py-2 text-sm text-gray-500 dark:text-white/55 sm:text-white/55">
-                                {syncError ?? t('noConversations')}
+                                {conversationListEmptyMessage}
                             </div>
                         ) : (
                             filteredConversationSummaries.map((summary) => (
@@ -1245,30 +1308,7 @@ export default function App() {
 
                 <div className="relative flex-1 overflow-hidden flex flex-col text-gray-800 dark:text-gray-200">
                     <div className="relative z-0 flex min-h-0 flex-1 flex-col">
-                        {showAdminCenter ? (
-                            <div className="flex min-h-0 flex-1 pt-16">
-                                <Suspense fallback={<ContentLoadingFallback />}>
-                                    <AdminCenter
-                                        onClose={() => setShowAdminCenter(false)}
-                                        onAuthExpired={handleLogout}
-                                    />
-                                </Suspense>
-                            </div>
-                        ) : showSettings ? (
-                            <div className="flex min-h-0 flex-1 pt-16">
-                                <Suspense fallback={<ContentLoadingFallback />}>
-                                    <SettingsPage
-                                        theme={theme}
-                                        setTheme={setTheme}
-                                        lightBg={lightBg}
-                                        setLightBg={setLightBg}
-                                        darkBg={darkBg}
-                                        setDarkBg={setDarkBg}
-                                        onClose={() => setShowSettings(false)}
-                                    />
-                                </Suspense>
-                            </div>
-                        ) : currentConversation ? (
+                        {currentConversation ? (
                             <Suspense fallback={<ContentLoadingFallback />}>
                                 <MainChat
                                     canWrite={currentConversation.canWrite}

@@ -17,6 +17,8 @@ type ConversationMessageResponse = {
         file_name: string;
         confidence: number;
     }>;
+    reasoning_content?: string | null;
+    reasoning_duration_ms?: number | null;
     created_at: string;
     updated_at: string;
 };
@@ -130,6 +132,8 @@ const normalizeMessage = (message: ConversationMessageResponse): Message => {
         role: message.role,
         content: message.content,
         ragSources: normalizeRagSources(message.rag_sources),
+        reasoningContent: message.reasoning_content ?? null,
+        reasoningDurationMs: message.reasoning_duration_ms ?? null,
         createdAt: message.created_at,
         updatedAt: message.updated_at,
     };
@@ -167,8 +171,17 @@ const normalizeSummary = (summary: ConversationSummaryResponse): ConversationSum
     };
 };
 
-export const fetchRemoteConversationList = async (): Promise<ConversationSummary[]> => {
-    const response = await fetch(`${apiBaseUrl}/conversations`, {
+export const fetchRemoteConversationList = async (
+    query = ''
+): Promise<ConversationSummary[]> => {
+    const params = new URLSearchParams();
+    const normalizedQuery = query.trim();
+    if (normalizedQuery) {
+        params.set('query', normalizedQuery);
+    }
+
+    const queryString = params.toString();
+    const response = await fetch(`${apiBaseUrl}/conversations${queryString ? `?${queryString}` : ''}`, {
         headers: authHeaders(),
     });
     await ensureOk(response);
@@ -204,6 +217,8 @@ export const saveRemoteConversation = async (
                     file_name: source.fileName,
                     confidence: source.confidence,
                 })),
+                reasoning_content: message.reasoningContent ?? null,
+                reasoning_duration_ms: message.reasoningDurationMs ?? null,
             })),
         }),
     });

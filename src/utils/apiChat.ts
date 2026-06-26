@@ -1,6 +1,6 @@
 import { apiBaseUrl } from './apiConfig';
 import { getAccessToken } from './auth';
-import type { RagSource } from './types';
+import type { Message, RagSource } from './types';
 
 export class ApiAuthError extends Error {
     constructor(message: string) {
@@ -11,6 +11,8 @@ export class ApiAuthError extends Error {
 
 type ChatChunkHandler = (content: string) => void;
 type RagSourcesHandler = (sources: RagSource[]) => void;
+type ReasoningChunkHandler = (content: string) => void;
+type ReasoningDoneHandler = (durationMs: number) => void;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null;
@@ -115,8 +117,12 @@ export const streamChat = async (
     conversationId: string,
     messageId: string,
     responseId: string,
+    messages: Message[],
+    enableThinking: boolean,
     onChunk: ChatChunkHandler,
-    onRagSources?: RagSourcesHandler
+    onRagSources?: RagSourcesHandler,
+    onReasoningChunk?: ReasoningChunkHandler,
+    onReasoningDone?: ReasoningDoneHandler
 ): Promise<void> => {
     const accessToken = getAccessToken();
     if (!accessToken) {
@@ -134,6 +140,16 @@ export const streamChat = async (
             conversation_id: conversationId,
             message_id: messageId,
             response_id: responseId,
+            enable_thinking: enableThinking,
+            messages: messages.map((message) => ({
+                id: message.id,
+                role: message.role,
+                content: message.content,
+                rag_sources: (message.ragSources ?? []).map((source) => ({
+                    file_name: source.fileName,
+                    confidence: source.confidence,
+                })),
+            })),
         }),
     });
 
@@ -182,6 +198,28 @@ export const streamChat = async (
                     && dataObj.type === 'rag_sources'
                 ) {
                     onRagSources?.(normalizeRagSources(dataObj.sources));
+                    eventEndIndex = buffer.indexOf('\n\n');
+                    continue;
+                }
+
+                if (
+                    isRecord(dataObj)
+                    && dataObj.type === 'reasoning'
+                    && typeof dataObj.content === 'string'
+                ) {
+                    onReasoningChunk?.(dataObj.content);
+                    eventEndIndex = buffer.indexOf('\n\n');
+                    continue;
+                }
+
+                if (
+                    isRecord(dataObj)
+                    && dataObj.type === 'reasoning_done'
+                ) {
+                    const durationMs = Number(dataObj.duration_ms ?? 0);
+                    if (Number.isFinite(durationMs)) {
+                        onReasoningDone?.(Math.max(0, durationMs));
+                    }
                     eventEndIndex = buffer.indexOf('\n\n');
                     continue;
                 }

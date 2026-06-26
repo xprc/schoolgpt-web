@@ -8,6 +8,9 @@ export type Message = {
     role: 'user' | 'ai';
     content: string;
     ragSources?: RagSource[];
+    reasoningContent?: string | null;
+    reasoningDurationMs?: number | null;
+    reasoningStartedAt?: number | null;
     createdAt?: string;
     updatedAt?: string;
 };

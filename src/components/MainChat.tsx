@@ -8,18 +8,37 @@ import {
     ArrowUp01Icon,
     Chat01Icon,
     Copy01Icon,
+    Csv01Icon,
+    Doc01Icon,
+    DocumentCodeIcon,
     Edit01Icon,
+    File01Icon,
+    FileAudioIcon,
+    FileVideoIcon,
+    FileZipIcon,
+    GoogleSheetIcon,
+    Image01Icon,
     Mic01Icon,
     MicOff01Icon,
     MoreVerticalIcon,
+    Pdf01Icon,
+    Ppt01Icon,
     Refresh01Icon,
     ThumbsDownIcon,
     ThumbsUpIcon,
+    Txt01Icon,
     VolumeMute01Icon,
     VolumeUpIcon
 } from 'hugeicons-react';
 import CodeBlock from './CodeBlock';
 import { ApiAuthError, streamChat } from '../utils/apiChat';
+import {
+    createMessageId,
+    formatConfidence,
+    formatThinkingDuration,
+    getSourceFileKind,
+    resolveThinkingDurationMs,
+} from '../utils/chatHelpers';
 import type { Message } from '../utils/types';
 
 type MainChatProps = {
@@ -77,16 +96,28 @@ type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
 
-const createMessageId = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
+const renderFileTypeIcon = (fileName: string) => {
+    const fileKind = getSourceFileKind(fileName);
+    const className = 'shrink-0 text-gray-500 dark:text-gray-300';
+    const props = {
+        size: 14,
+        className,
+        'aria-hidden': true,
+    };
 
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
+    if (fileKind === 'pdf') return <Pdf01Icon {...props} />;
+    if (fileKind === 'text') return <Txt01Icon {...props} />;
+    if (fileKind === 'csv') return <Csv01Icon {...props} />;
+    if (fileKind === 'document') return <Doc01Icon {...props} />;
+    if (fileKind === 'spreadsheet') return <GoogleSheetIcon {...props} />;
+    if (fileKind === 'presentation') return <Ppt01Icon {...props} />;
+    if (fileKind === 'image') return <Image01Icon {...props} />;
+    if (fileKind === 'archive') return <FileZipIcon {...props} />;
+    if (fileKind === 'audio') return <FileAudioIcon {...props} />;
+    if (fileKind === 'video') return <FileVideoIcon {...props} />;
+    if (fileKind === 'code') return <DocumentCodeIcon {...props} />;
 
-const formatConfidence = (confidence: number): string => {
-    return `${Math.round(Math.min(1, Math.max(0, confidence)) * 100)}%`;
+    return <File01Icon {...props} />;
 };
 
 export default function MainChat({
@@ -103,8 +134,24 @@ export default function MainChat({
     const [isLoading, setIsLoading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [speakingId, setSpeakingId] = useState<string | null>(null);
+    const [nowMs, setNowMs] = useState(() => Date.now());
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+    useEffect(() => {
+        if (!isLoading) {
+            return;
+        }
+
+        setNowMs(Date.now());
+        const timerId = window.setInterval(() => {
+            setNowMs(Date.now());
+        }, 1000);
+
+        return () => {
+            window.clearInterval(timerId);
+        };
+    }, [isLoading]);
 
     useEffect(() => {
         const speechWindow = window as SpeechRecognitionWindow;
@@ -163,18 +210,22 @@ export default function MainChat({
         setEditContent(content);
     };
 
-    const saveEdit = (id: string) => {
-        if (!canWrite) return;
+    const saveEdit = async (id: string) => {
+        if (!canWrite || isLoading) return;
 
-        const conversationId = ensureConversationId();
-        if (!conversationId) return;
+        const query = editContent.trim();
+        if (!query) return;
 
-        const nextMessages = messages.map((m) =>
-            m.id === id ? { ...m, content: editContent } : m
+        const messageIndex = messages.findIndex((message) => message.id === id);
+        if (messageIndex < 0 || messages[messageIndex].role !== 'user') return;
+
+        const nextMessages = messages.slice(0, messageIndex + 1).map((message, index) =>
+            index === messageIndex ? { ...message, content: query } : message
         );
-        setMessages(nextMessages);
-        void onMessagesCommitted(conversationId, nextMessages);
         setEditingId(null);
+        setEditContent('');
+        setMessages(nextMessages);
+        await submitMessage(query, nextMessages);
     };
 
     const cancelEdit = () => {
@@ -225,7 +276,15 @@ export default function MainChat({
 
         const responseId = createMessageId();
         const userMessageId = currentMessages[currentMessages.length - 1]?.id ?? createMessageId();
-        const newAiMsg: Message = { id: responseId, role: 'ai', content: '', ragSources: [] };
+        const newAiMsg: Message = {
+            id: responseId,
+            role: 'ai',
+            content: '',
+            ragSources: [],
+            reasoningContent: '',
+            reasoningDurationMs: null,
+            reasoningStartedAt: Date.now(),
+        };
         let committedMessages = [...currentMessages, newAiMsg];
         let shouldCommit = true;
         setMessages(committedMessages);
@@ -238,6 +297,8 @@ export default function MainChat({
                 conversationId,
                 userMessageId,
                 responseId,
+                currentMessages,
+                mode !== 'quick',
                 (parsedText) => {
                     aiContent += parsedText;
                     committedMessages = committedMessages.map((m) =>
@@ -248,6 +309,29 @@ export default function MainChat({
                 (ragSources) => {
                     committedMessages = committedMessages.map((m) =>
                         m.id === responseId ? { ...m, ragSources } : m
+                    );
+                    setMessages(committedMessages);
+                },
+                (reasoningText) => {
+                    committedMessages = committedMessages.map((m) =>
+                        m.id === responseId
+                            ? {
+                                ...m,
+                                reasoningContent: `${m.reasoningContent ?? ''}${reasoningText}`,
+                                reasoningStartedAt: m.reasoningStartedAt ?? Date.now(),
+                            }
+                            : m
+                    );
+                    setMessages(committedMessages);
+                },
+                (reasoningDurationMs) => {
+                    committedMessages = committedMessages.map((m) =>
+                        m.id === responseId
+                            ? {
+                                ...m,
+                                reasoningDurationMs,
+                            }
+                            : m
                     );
                     setMessages(committedMessages);
                 }
@@ -407,45 +491,103 @@ export default function MainChat({
                                                 <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
                                                     校园百事通 <ArrowDown01Icon size={14} />
                                                 </div>
-                                                {isLoading && index === messages.length - 1 && !msg.content.trim() ? (
-                                                    <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
-                                                        <Refresh01Icon size={14} className="animate-spin" />
-                                                        {mode === 'thinking' ? t('thinking') : t('generating')}
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
-                                                            <ReactMarkdown
-                                                                components={{ code: CodeBlock }}
-                                                                remarkPlugins={[remarkGfm]}
-                                                            >
-                                                                {msg.content}
-                                                            </ReactMarkdown>
+                                                <>
+                                                    {((msg.reasoningContent?.trim().length ?? 0) > 0 || msg.reasoningDurationMs != null) && (
+                                                        <details className="group rounded-2xl border border-gray-200/70 bg-white/45 dark:border-white/10 dark:bg-white/[0.04]">
+                                                            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 outline-none transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+                                                                <ArrowDown01Icon
+                                                                    size={14}
+                                                                    className="shrink-0 transition-transform group-open:rotate-180"
+                                                                />
+                                                                <span>
+                                                                    {msg.reasoningDurationMs == null && isLoading && index === messages.length - 1
+                                                                        ? t('reasoningInProgress', {
+                                                                            duration: formatThinkingDuration(
+                                                                                resolveThinkingDurationMs(
+                                                                                    msg.reasoningDurationMs,
+                                                                                    msg.reasoningStartedAt,
+                                                                                    nowMs
+                                                                                )
+                                                                            ) || '0s',
+                                                                        })
+                                                                        : formatThinkingDuration(
+                                                                            resolveThinkingDurationMs(
+                                                                                msg.reasoningDurationMs,
+                                                                                msg.reasoningStartedAt,
+                                                                                nowMs
+                                                                            )
+                                                                        )
+                                                                            ? t('reasoningComplete', {
+                                                                                duration: formatThinkingDuration(
+                                                                                    resolveThinkingDurationMs(
+                                                                                        msg.reasoningDurationMs,
+                                                                                        msg.reasoningStartedAt,
+                                                                                        nowMs
+                                                                                    )
+                                                                                ),
+                                                                            })
+                                                                            : t('reasoningCompleteNoDuration')}
+                                                                </span>
+                                                            </summary>
+                                                            {(msg.reasoningContent?.trim().length ?? 0) > 0 && (
+                                                                <div className="border-t border-gray-200/70 px-3 py-3 text-[13px] leading-6 text-gray-600 whitespace-pre-wrap [overflow-wrap:anywhere] dark:border-white/10 dark:text-gray-300">
+                                                                    {msg.reasoningContent}
+                                                                </div>
+                                                            )}
+                                                        </details>
+                                                    )}
+                                                    {isLoading && index === messages.length - 1 && !msg.content.trim() ? (
+                                                        <div className="text-[15px] text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
+                                                            <Refresh01Icon size={14} className="animate-spin" />
+                                                            {mode === 'quick'
+                                                                ? t('generating')
+                                                                : t('reasoningInProgress', {
+                                                                    duration: formatThinkingDuration(
+                                                                        resolveThinkingDurationMs(
+                                                                            msg.reasoningDurationMs,
+                                                                            msg.reasoningStartedAt,
+                                                                            nowMs
+                                                                        )
+                                                                    ) || '0s',
+                                                                })}
                                                         </div>
-                                                        {(msg.ragSources?.length ?? 0) > 0 && (
-                                                            <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
-                                                                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                                    RAG 来源
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {msg.ragSources?.map((source) => (
-                                                                        <span
-                                                                            key={source.fileName}
-                                                                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white/60 px-2.5 py-1 text-xs text-gray-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200"
-                                                                        >
-                                                                            <span className="max-w-[220px] truncate">
-                                                                                {source.fileName}
-                                                                            </span>
-                                                                            <span className="shrink-0 font-semibold text-[#5b6ef5] dark:text-blue-300">
-                                                                                {formatConfidence(source.confidence)}
-                                                                            </span>
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
+                                                    ) : (
+                                                        msg.content.trim() !== '' && (
+                                                            <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
+                                                                <ReactMarkdown
+                                                                    components={{ code: CodeBlock }}
+                                                                    remarkPlugins={[remarkGfm]}
+                                                                >
+                                                                    {msg.content}
+                                                                </ReactMarkdown>
                                                             </div>
-                                                        )}
-                                                        {msg.content.trim() !== '' && (
-                                                            <div className="flex items-center gap-1 pt-1">
+                                                        )
+                                                    )}
+                                                    {(msg.ragSources?.length ?? 0) > 0 && (
+                                                        <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
+                                                            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                RAG 来源
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {msg.ragSources?.map((source) => (
+                                                                    <span
+                                                                        key={source.fileName}
+                                                                        className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white/60 px-2.5 py-1 text-xs text-gray-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200"
+                                                                    >
+                                                                        {renderFileTypeIcon(source.fileName)}
+                                                                        <span className="max-w-[220px] truncate">
+                                                                            {source.fileName}
+                                                                        </span>
+                                                                        <span className="shrink-0 font-semibold text-[#5b6ef5] dark:text-blue-300">
+                                                                            {formatConfidence(source.confidence)}
+                                                                        </span>
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {msg.content.trim() !== '' && (
+                                                        <div className="flex items-center gap-1 pt-1">
                                                                 <button className="flex h-8 w-8 items-center justify-center text-[#5b6ef5] dark:text-blue-400 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors">
                                                                     <ThumbsUpIcon size={16} />
                                                                 </button>
@@ -489,7 +631,6 @@ export default function MainChat({
                                                             </div>
                                                         )}
                                                     </>
-                                                )}
                                             </div>
                                         </div>
                                     </div>
