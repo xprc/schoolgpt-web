@@ -15,6 +15,13 @@ export type Message = {
     updatedAt?: string;
 };
 
+export type UserMemory = {
+    id: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
 export type ConversationShareScope = 'private' | 'link_read' | 'link_write';
 
 export type ConversationPermission = 'owner' | 'read' | 'write';

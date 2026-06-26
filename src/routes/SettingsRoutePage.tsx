@@ -7,7 +7,7 @@ export default function SettingsRoutePage() {
 
     return (
         <RoutePageFrame>
-            {({ appearance }) => (
+            {({ appearance, onAuthExpired }) => (
                 <SettingsPage
                     theme={appearance.theme}
                     setTheme={appearance.setTheme}
@@ -16,6 +16,7 @@ export default function SettingsRoutePage() {
                     darkBg={appearance.darkBg}
                     setDarkBg={appearance.setDarkBg}
                     onClose={() => navigate('/')}
+                    onAuthExpired={onAuthExpired}
                 />
             )}
         </RoutePageFrame>
