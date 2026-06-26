@@ -10,7 +10,7 @@ import {
     type SetStateAction,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import {
     Add01Icon,
     ArrowDown01Icon,
@@ -197,6 +197,8 @@ export default function App() {
     const location = useLocation();
     const { conversationId } = useParams<{ conversationId: string }>();
     const routeConversationId = isConversationRouteId(conversationId) ? conversationId : null;
+    const isDraftRoute = location.pathname === '/';
+    const isShareRoute = location.pathname.startsWith('/share/');
     const { backgroundStyle, topBlendStyle } = useAppearanceSettings();
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
@@ -282,36 +284,15 @@ export default function App() {
 
     const navigateToConversation = useCallback((nextConversationId: string, replace = false) => {
         navigate(`/chat/${nextConversationId}`, { replace });
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [navigate]);
 
     const navigateToDraftConversation = useCallback((replace = false) => {
         navigate('/', { replace });
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [navigate]);
-
-    const navigateToActiveConversation = useCallback((replace = false) => {
-        if (currentConversation && currentConversation.id !== draftConversationId) {
-            navigateToConversation(currentConversation.id, replace);
-            return;
-        }
-
-        if (routeConversationId) {
-            navigateToConversation(routeConversationId, replace);
-            return;
-        }
-
-        navigateToDraftConversation(replace);
-    }, [
-        currentConversation,
-        navigateToConversation,
-        navigateToDraftConversation,
-        routeConversationId,
-    ]);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
         setSession(nextSession);
@@ -321,7 +302,6 @@ export default function App() {
         clearAuthSession();
         setSession(null);
         setShowProfilePanel(false);
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
         setCurrentConversation(null);
@@ -473,7 +453,6 @@ export default function App() {
     }, [conversationId, navigate]);
 
     useEffect(() => {
-        setShowSharePanel(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
     }, [location.pathname]);
@@ -964,6 +943,22 @@ export default function App() {
         ? `${window.location.origin}/share/${currentConversation.id}`
         : '';
 
+    const handleShareButtonClick = useCallback(() => {
+        if (!currentConversation || currentConversation.id === draftConversationId) {
+            return;
+        }
+
+        setShowProfilePanel(false);
+        setOpenConversationMenuId(null);
+
+        if (isShareRoute) {
+            navigateToConversation(currentConversation.id);
+            return;
+        }
+
+        navigate(`/share/${currentConversation.id}`);
+    }, [currentConversation, isShareRoute, navigate, navigateToConversation]);
+
     const handleCopyShareLink = useCallback(async () => {
         if (!shareUrl) return;
 
@@ -1068,10 +1063,6 @@ export default function App() {
                 </Suspense>
             </div>
         );
-    }
-
-    if (isAdminRoute && session.user.userType !== 'admin') {
-        return <Navigate to="/" replace />;
     }
 
     return (
@@ -1186,7 +1177,6 @@ export default function App() {
                     <button
                         type="button"
                         onClick={() => {
-                            setShowSharePanel(false);
                             setShowProfilePanel(false);
                             navigate('/settings');
                         }}
@@ -1199,7 +1189,6 @@ export default function App() {
                         <button
                             type="button"
                             onClick={() => {
-                                setShowSharePanel(false);
                                 setShowProfilePanel(false);
                                 navigate('/admin');
                             }}
