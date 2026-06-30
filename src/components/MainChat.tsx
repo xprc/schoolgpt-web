@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import {
     Add01Icon,
@@ -30,7 +28,7 @@ import {
     VolumeMute01Icon,
     VolumeUpIcon
 } from 'hugeicons-react';
-import CodeBlock from './CodeBlock';
+import MarkdownContent from './MarkdownContent';
 import { ApiAuthError, streamChat } from '../utils/apiChat';
 import {
     createMessageId,
@@ -118,6 +116,31 @@ const renderFileTypeIcon = (fileName: string) => {
     if (fileKind === 'code') return <DocumentCodeIcon {...props} />;
 
     return <File01Icon {...props} />;
+};
+
+const padTimePart = (value: number): string => value.toString().padStart(2, '0');
+
+const formatAiMessageTime = (value: string | undefined, language: string): string => {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    if (language.startsWith('zh')) {
+        return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}`;
+    }
+
+    return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(date);
 };
 
 export default function MainChat({
@@ -276,6 +299,7 @@ export default function MainChat({
 
         const responseId = createMessageId();
         const userMessageId = currentMessages[currentMessages.length - 1]?.id ?? createMessageId();
+        const responseCreatedAt = new Date().toISOString();
         const newAiMsg: Message = {
             id: responseId,
             role: 'ai',
@@ -284,6 +308,8 @@ export default function MainChat({
             reasoningContent: '',
             reasoningDurationMs: null,
             reasoningStartedAt: Date.now(),
+            createdAt: responseCreatedAt,
+            updatedAt: responseCreatedAt,
         };
         let committedMessages = [...currentMessages, newAiMsg];
         let shouldCommit = true;
@@ -364,10 +390,13 @@ export default function MainChat({
         const query = input.trim();
         if (!query || isLoading || !canWrite) return;
 
+        const userCreatedAt = new Date().toISOString();
         const newUserMsg: Message = {
             id: createMessageId(),
             role: 'user',
             content: query,
+            createdAt: userCreatedAt,
+            updatedAt: userCreatedAt,
         };
         const updatedMessages = [...messages, newUserMsg];
         setMessages(updatedMessages);
@@ -488,8 +517,15 @@ export default function MainChat({
                                     <div className="flex gap-3 sm:gap-4 min-w-0">
                                         <div className="flex-1 min-w-0 space-y-3">
                                             <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 pt-4 pb-2.5 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3 overflow-hidden">
-                                                <div className="flex items-center gap-1 text-[#5b6ef5] dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
-                                                    校园百事通 <ArrowDown01Icon size={14} />
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                                                    <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-[#5b6ef5] dark:text-blue-400">
+                                                        校园百事通 <ArrowDown01Icon size={14} />
+                                                    </span>
+                                                    {formatAiMessageTime(msg.createdAt, i18n.language) && (
+                                                        <span className="font-medium text-gray-500 dark:text-gray-400">
+                                                            {formatAiMessageTime(msg.createdAt, i18n.language)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <>
                                                     {((msg.reasoningContent?.trim().length ?? 0) > 0 || msg.reasoningDurationMs != null) && (
@@ -554,12 +590,7 @@ export default function MainChat({
                                                     ) : (
                                                         msg.content.trim() !== '' && (
                                                             <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
-                                                                <ReactMarkdown
-                                                                    components={{ code: CodeBlock }}
-                                                                    remarkPlugins={[remarkGfm]}
-                                                                >
-                                                                    {msg.content}
-                                                                </ReactMarkdown>
+                                                                <MarkdownContent content={msg.content} />
                                                             </div>
                                                         )
                                                     )}

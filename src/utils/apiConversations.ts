@@ -219,6 +219,8 @@ export const saveRemoteConversation = async (
                 })),
                 reasoning_content: message.reasoningContent ?? null,
                 reasoning_duration_ms: message.reasoningDurationMs ?? null,
+                created_at: message.createdAt ?? null,
+                updated_at: message.updatedAt ?? null,
             })),
         }),
     });
@@ -237,6 +239,18 @@ export const updateRemoteConversationShare = async (
         body: JSON.stringify({
             share_scope: shareScope,
         }),
+    });
+    await ensureOk(response);
+
+    return normalizeConversation((await response.json()) as ConversationResponse);
+};
+
+export const continueRemoteSharedConversation = async (
+    conversationId: string
+): Promise<Conversation> => {
+    const response = await fetch(`${apiBaseUrl}/conversations/${conversationId}/share/continue`, {
+        method: 'POST',
+        headers: authHeaders(),
     });
     await ensureOk(response);
 

@@ -26,3 +26,33 @@
 .dark .markdown-body th {
     background: rgb(255 255 255 / 0.08);
 }
+
+.markdown-body .math-inline {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: -0.2em;
+}
+
+.markdown-body .math-block {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25rem 0;
+}
+
+.markdown-body .math-block .katex-display {
+    margin: 0.35rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.markdown-body td .math-block,
+.markdown-body th .math-block {
+    padding: 0;
+}
+
+.markdown-body td .math-block .katex-display,
+.markdown-body th .math-block .katex-display {
+    margin: 0;
+}

@@ -31,6 +31,7 @@ import {
 import ChatItem from './ChatItem';
 import {
     ApiRequestError,
+    continueRemoteSharedConversation,
     deleteRemoteConversation,
     fetchRemoteConversation,
     fetchRemoteConversationList,
@@ -192,19 +193,20 @@ const upsertSummary = (
 };
 
 export default function App() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const { conversationId } = useParams<{ conversationId: string }>();
     const routeConversationId = isConversationRouteId(conversationId) ? conversationId : null;
     const isDraftRoute = location.pathname === '/';
     const isShareRoute = location.pathname.startsWith('/share/');
-    const { backgroundStyle, topBlendStyle } = useAppearanceSettings();
+    const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
+    const { backgroundStyle, topBlendStyle } = useAppearanceSettings(session?.user);
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
+    const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
     const [shareCopied, setShareCopied] = useState(false);
-    const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
     const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
     const [conversationSummaries, setConversationSummaries] = useState<ConversationSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -219,6 +221,12 @@ export default function App() {
     const clientCreatedConversationIdsRef = useRef(new Set<string>());
     const [avatarUrl, setAvatarUrl] = useState(() => getGravatarFallbackAvatarUrl(''));
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+    useEffect(() => {
+        if (session?.user.preferredLanguage) {
+            void i18n.changeLanguage(session.user.preferredLanguage);
+        }
+    }, [i18n, session?.user.preferredLanguage]);
 
     const upsertConversationSummaryState = useCallback((summary: ConversationSummary) => {
         setConversationSummaries((prev) => upsertSummary(prev, summary));
@@ -302,6 +310,7 @@ export default function App() {
         clearAuthSession();
         setSession(null);
         setShowProfilePanel(false);
+        setIsSharePanelOpen(false);
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
         setCurrentConversation(null);
@@ -455,6 +464,7 @@ export default function App() {
     useEffect(() => {
         setOpenConversationMenuId(null);
         setRenamingConversationId(null);
+        setIsSharePanelOpen(false);
     }, [location.pathname]);
 
     useEffect(() => {
@@ -496,14 +506,16 @@ export default function App() {
 
         const loadConversation = async () => {
             setSyncError(null);
-            const localConversation = await getLocalConversation(
-                session.user.id,
-                routeConversationId
-            );
+            const localConversation = isShareRoute
+                ? null
+                : await getLocalConversation(
+                    session.user.id,
+                    routeConversationId
+                );
             const emptyConversation = createEmptyConversation(routeConversationId, session.user.id);
 
             if (!cancelled) {
-                setCurrentConversation(localConversation ?? emptyConversation);
+                setCurrentConversation(isShareRoute ? null : localConversation ?? emptyConversation);
             }
 
             try {
@@ -511,6 +523,7 @@ export default function App() {
                 let nextConversation = remoteConversation;
 
                 if (
+                    !isShareRoute &&
                     localConversation &&
                     localConversation.canWrite &&
                     timestampMs(localConversation.updatedAt) > timestampMs(remoteConversation.updatedAt)
@@ -520,9 +533,13 @@ export default function App() {
 
                 if (!cancelled) {
                     setCurrentConversation(nextConversation);
-                    upsertConversationSummaryState(toSummary(nextConversation));
+                    if (!isShareRoute) {
+                        upsertConversationSummaryState(toSummary(nextConversation));
+                    }
                 }
-                await saveLocalConversation(session.user.id, nextConversation);
+                if (!isShareRoute) {
+                    await saveLocalConversation(session.user.id, nextConversation);
+                }
             } catch (error: unknown) {
                 if (error instanceof ApiAuthError) {
                     handleLogout();
@@ -555,6 +572,7 @@ export default function App() {
         };
     }, [
         handleLogout,
+        isShareRoute,
         navigateToDraftConversation,
         refreshConversationList,
         removeConversationSummaryState,
@@ -569,6 +587,7 @@ export default function App() {
             setupState !== 'ready' ||
             !session ||
             !currentConversation ||
+            isShareRoute ||
             currentConversation.id === draftConversationId
         ) {
             return;
@@ -579,7 +598,7 @@ export default function App() {
         }, 300);
 
         return () => window.clearTimeout(timer);
-    }, [currentConversation, session, setupState]);
+    }, [currentConversation, isShareRoute, session, setupState]);
 
     const setMessages = useCallback<Dispatch<SetStateAction<Message[]>>>((value) => {
         setCurrentConversation((prev) => {
@@ -756,6 +775,45 @@ export default function App() {
         },
         [currentConversation, handleLogout, session, upsertConversationSummaryState]
     );
+
+    const handleContinueSharedConversation = useCallback(async () => {
+        if (
+            !session ||
+            !currentConversation ||
+            !isShareRoute ||
+            currentConversation.id === draftConversationId ||
+            currentConversation.shareScope !== 'link_write'
+        ) {
+            return;
+        }
+
+        try {
+            const savedConversation = await continueRemoteSharedConversation(currentConversation.id);
+            setCurrentConversation(savedConversation);
+            upsertConversationSummaryState(toSummary(savedConversation));
+            await saveLocalConversation(session.user.id, savedConversation);
+            setSyncError(null);
+            setIsSharePanelOpen(false);
+            navigateToConversation(savedConversation.id, true);
+            void refreshConversationList();
+        } catch (error: unknown) {
+            if (error instanceof ApiAuthError) {
+                handleLogout();
+                return;
+            }
+
+            const message = error instanceof Error ? error.message : String(error);
+            setSyncError(message);
+        }
+    }, [
+        currentConversation,
+        handleLogout,
+        isShareRoute,
+        navigateToConversation,
+        refreshConversationList,
+        session,
+        upsertConversationSummaryState,
+    ]);
 
     const handleStartRenameConversation = useCallback(
         (summary: ConversationSummary) => {
@@ -950,14 +1008,9 @@ export default function App() {
 
         setShowProfilePanel(false);
         setOpenConversationMenuId(null);
-
-        if (isShareRoute) {
-            navigateToConversation(currentConversation.id);
-            return;
-        }
-
-        navigate(`/share/${currentConversation.id}`);
-    }, [currentConversation, isShareRoute, navigate, navigateToConversation]);
+        setShareCopied(false);
+        setIsSharePanelOpen((prev) => !prev);
+    }, [currentConversation]);
 
     const handleCopyShareLink = useCallback(async () => {
         if (!shareUrl) return;
@@ -1022,6 +1075,16 @@ export default function App() {
         { label: t('shareRead'), scope: 'link_read' },
         { label: t('shareWrite'), scope: 'link_write' },
     ];
+    const canManageCurrentConversationShare =
+        currentConversation !== null &&
+        currentConversation.id !== draftConversationId &&
+        currentConversation.permission === 'owner';
+    const canContinueCurrentShare =
+        isShareRoute &&
+        currentConversation !== null &&
+        currentConversation.id !== draftConversationId &&
+        currentConversation.permission !== 'owner' &&
+        currentConversation.shareScope === 'link_write';
 
     if (setupState === 'checking') {
         return (
@@ -1124,7 +1187,17 @@ export default function App() {
                         <span className="text-sm">{t('online')}</span>
                         <ArrowDown01Icon size={14} className="ml-1" />
                     </div>
-                    {currentConversation && currentConversation.id !== draftConversationId && (
+                    {canContinueCurrentShare && (
+                        <button
+                            type="button"
+                            onClick={handleContinueSharedConversation}
+                            className="flex h-10 items-center gap-2 rounded-full bg-[#c2e7ff] px-3 text-sm font-medium text-[#001d35] transition-colors hover:bg-[#b3dcf5]"
+                        >
+                            <Edit01Icon size={17} />
+                            <span className="hidden sm:inline">{t('continueConversation')}</span>
+                        </button>
+                    )}
+                    {canManageCurrentConversationShare && currentConversation && (
                         <div className="relative">
                             <button
                                 onClick={handleShareButtonClick}
@@ -1133,7 +1206,7 @@ export default function App() {
                             >
                                 <Share01Icon size={20} />
                             </button>
-                            {isShareRoute && (
+                            {isSharePanelOpen && (
                                 <div className="absolute right-0 top-11 w-72 rounded-2xl border border-white/20 bg-[#151923]/95 p-3 shadow-2xl backdrop-blur-xl">
                                     <div className="px-2 pb-2 text-sm font-semibold text-white">
                                         {t('share')}
@@ -1143,13 +1216,12 @@ export default function App() {
                                             <button
                                                 key={option.scope}
                                                 type="button"
-                                                disabled={currentConversation.permission !== 'owner'}
                                                 onClick={() => handleShareScopeChange(option.scope)}
                                                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors ${
                                                     currentConversation.shareScope === option.scope
                                                         ? 'bg-white/15 text-white'
                                                         : 'text-white/75 hover:bg-white/10 hover:text-white'
-                                                } disabled:cursor-not-allowed disabled:text-white/35 disabled:hover:bg-transparent`}
+                                                }`}
                                             >
                                                 <span>{option.label}</span>
                                                 {currentConversation.shareScope === option.scope && (

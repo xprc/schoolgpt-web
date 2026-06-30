@@ -19,6 +19,7 @@ const ProfilePanel = lazy(() => import('../components/ProfilePanel'));
 export type RoutePageFrameContext = {
     session: AuthSession;
     onAuthExpired: () => void;
+    onSessionUpdate: (session: AuthSession) => void;
     appearance: AppearanceSettings;
 };
 
@@ -33,13 +34,19 @@ const PageLoadingFallback = () => (
 );
 
 export default function RoutePageFrame({ children }: RoutePageFrameProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
-    const appearance = useAppearanceSettings();
     const [setupState, setSetupState] = useState<'checking' | 'required' | 'ready'>('checking');
     const [setupError, setSetupError] = useState<string | null>(null);
     const [session, setSession] = useState<AuthSession | null>(() => getStoredSession());
+    const appearance = useAppearanceSettings(session?.user);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
+
+    useEffect(() => {
+        if (session?.user.preferredLanguage) {
+            void i18n.changeLanguage(session.user.preferredLanguage);
+        }
+    }, [i18n, session?.user.preferredLanguage]);
 
     useEffect(() => {
         let cancelled = false;
@@ -91,6 +98,10 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
     }, []);
 
     const handleLogin = useCallback((nextSession: AuthSession) => {
+        setSession(nextSession);
+    }, []);
+
+    const handleSessionUpdate = useCallback((nextSession: AuthSession) => {
         setSession(nextSession);
     }, []);
 
@@ -222,6 +233,7 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
                 {children({
                     session,
                     onAuthExpired: handleLogout,
+                    onSessionUpdate: handleSessionUpdate,
                     appearance,
                 })}
             </main>

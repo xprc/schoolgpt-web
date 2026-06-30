@@ -1,4 +1,8 @@
 import { apiBaseUrl } from './apiConfig';
+import { DARK_BG, LIGHT_BG, normalizeBackground } from './backgrounds';
+
+export type UserLanguage = 'en' | 'zh';
+export type UserType = 'student' | 'teacher' | 'maintenance' | 'admin';
 
 export type AuthUser = {
     id: number;
@@ -6,7 +10,10 @@ export type AuthUser = {
     email: string;
     avatarSha256: string;
     displayName: string;
-    userType: 'student' | 'teacher' | 'maintenance' | 'admin';
+    userType: UserType;
+    preferredLanguage: UserLanguage;
+    lightBackground: string;
+    darkBackground: string;
 };
 
 export type AuthSession = {
@@ -14,33 +21,70 @@ export type AuthSession = {
     user: AuthUser;
 };
 
+type UserProfileResponse = {
+    id: number;
+    username: string;
+    email: string;
+    avatar_sha256: string;
+    display_name: string;
+    user_type: UserType;
+    preferred_language?: UserLanguage;
+    light_background?: string;
+    dark_background?: string;
+};
+
 type LoginResponse = {
     access_token: string;
     token_type: string;
-    user: {
-        id: number;
-        username: string;
-        email: string;
-        avatar_sha256: string;
-        display_name: string;
-        user_type: 'student' | 'teacher' | 'maintenance' | 'admin';
-    };
+    user: UserProfileResponse;
 };
 
 const authStorageKey = 'schoolgpt.auth.session';
+const defaultLanguage = 'zh';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null;
 };
 
-const normalizeUser = (user: LoginResponse['user']): AuthUser => {
+export class AuthSessionError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'AuthSessionError';
+    }
+}
+
+const normalizeLanguage = (value: unknown): UserLanguage => {
+    return value === 'en' || value === 'zh' ? value : defaultLanguage;
+};
+
+const normalizeUserType = (value: unknown, username: string): UserType => {
+    if (
+        value === 'student' ||
+        value === 'teacher' ||
+        value === 'maintenance' ||
+        value === 'admin'
+    ) {
+        return value;
+    }
+
+    return username === 'admin' ? 'admin' : 'student';
+};
+
+const readStoredLanguage = (): UserLanguage => {
+    return normalizeLanguage(localStorage.getItem('language'));
+};
+
+const normalizeUser = (user: UserProfileResponse): AuthUser => {
     return {
         id: user.id,
         username: user.username,
         email: user.email,
         avatarSha256: user.avatar_sha256,
         displayName: user.display_name,
-        userType: user.user_type,
+        userType: normalizeUserType(user.user_type, user.username),
+        preferredLanguage: normalizeLanguage(user.preferred_language ?? readStoredLanguage()),
+        lightBackground: normalizeBackground(user.light_background ?? null, LIGHT_BG[0]),
+        darkBackground: normalizeBackground(user.dark_background ?? null, DARK_BG[0]),
     };
 };
 
@@ -92,11 +136,16 @@ export const getStoredSession = (): AuthSession | null => {
                 email: user.email,
                 avatarSha256: typeof user.avatarSha256 === 'string' ? user.avatarSha256 : '',
                 displayName: user.displayName,
-                userType: typeof user.userType === 'string'
-                    ? user.userType as AuthUser['userType']
-                    : user.username === 'admin'
-                        ? 'admin'
-                        : 'student',
+                userType: normalizeUserType(user.userType, user.username),
+                preferredLanguage: normalizeLanguage(user.preferredLanguage ?? readStoredLanguage()),
+                lightBackground: normalizeBackground(
+                    typeof user.lightBackground === 'string' ? user.lightBackground : null,
+                    LIGHT_BG[0]
+                ),
+                darkBackground: normalizeBackground(
+                    typeof user.darkBackground === 'string' ? user.darkBackground : null,
+                    DARK_BG[0]
+                ),
             },
         };
     } catch {
@@ -137,4 +186,48 @@ export const login = async (identifier: string, password: string): Promise<AuthS
 
     saveAuthSession(session);
     return session;
+};
+
+export type UserPreferencesUpdate = {
+    preferredLanguage: UserLanguage;
+    lightBackground: string;
+    darkBackground: string;
+};
+
+export const updateCurrentUserPreferences = async (
+    preferences: UserPreferencesUpdate
+): Promise<AuthSession> => {
+    const session = getStoredSession();
+    if (!session) {
+        throw new AuthSessionError('请先登录');
+    }
+
+    const response = await fetch(`${apiBaseUrl}/auth/me`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify({
+            preferred_language: preferences.preferredLanguage,
+            light_background: preferences.lightBackground,
+            dark_background: preferences.darkBackground,
+        }),
+    });
+
+    if (response.status === 401) {
+        throw new AuthSessionError('登录已过期，请重新登录');
+    }
+
+    if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+    }
+
+    const nextSession: AuthSession = {
+        accessToken: session.accessToken,
+        user: normalizeUser((await response.json()) as UserProfileResponse),
+    };
+
+    saveAuthSession(nextSession);
+    return nextSession;
 };

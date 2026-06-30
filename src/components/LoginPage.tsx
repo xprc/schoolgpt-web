@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BotIcon } from 'hugeicons-react';
 import { login, type AuthSession } from '../utils/auth';
 
 type LoginPageProps = {
@@ -43,8 +42,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 className="w-full max-w-[420px] rounded-lg border border-white/60 bg-white/86 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.25)] backdrop-blur-2xl dark:border-white/10 dark:bg-[#10131b]/88 sm:p-8"
             >
                 <div className="mb-7 flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#5b6ef5] text-white shadow-sm">
-                        <BotIcon size={24} />
+                    <div className="flex h-11 w-11 items-center justify-center text-white">
+                        <img src="/favicon.ico" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">

@@ -15,17 +15,42 @@ export type AppearanceSettings = {
     topBlendStyle: CSSProperties;
 };
 
-export const useAppearanceSettings = (): AppearanceSettings => {
+type UserAppearancePreferences = {
+    lightBackground?: string;
+    darkBackground?: string;
+};
+
+export const useAppearanceSettings = (
+    preferences?: UserAppearancePreferences | null
+): AppearanceSettings => {
     const [theme, setTheme] = useState<AppTheme>(
         () => (localStorage.getItem('theme') as AppTheme) || 'system'
     );
     const [lightBg, setLightBg] = useState(
-        () => normalizeBackground(localStorage.getItem('lightBg'), LIGHT_BG[0])
+        () => normalizeBackground(
+            preferences?.lightBackground ?? localStorage.getItem('lightBg'),
+            LIGHT_BG[0]
+        )
     );
     const [darkBg, setDarkBg] = useState(
-        () => normalizeBackground(localStorage.getItem('darkBg'), DARK_BG[0])
+        () => normalizeBackground(
+            preferences?.darkBackground ?? localStorage.getItem('darkBg'),
+            DARK_BG[0]
+        )
     );
     const [resolvedDark, setResolvedDark] = useState(false);
+
+    useEffect(() => {
+        if (preferences?.lightBackground) {
+            setLightBg(normalizeBackground(preferences.lightBackground, LIGHT_BG[0]));
+        }
+    }, [preferences?.lightBackground]);
+
+    useEffect(() => {
+        if (preferences?.darkBackground) {
+            setDarkBg(normalizeBackground(preferences.darkBackground, DARK_BG[0]));
+        }
+    }, [preferences?.darkBackground]);
 
     useEffect(() => {
         localStorage.setItem('lightBg', lightBg);

@@ -15,6 +15,12 @@ import {
     fetchUserMemories,
     updateUserMemory,
 } from '../utils/apiMemories';
+import {
+    AuthSessionError,
+    updateCurrentUserPreferences,
+    type AuthSession,
+    type UserLanguage,
+} from '../utils/auth';
 import { DARK_BG, LIGHT_BG } from '../utils/backgrounds';
 import type { UserMemory } from '../utils/types';
 
@@ -27,6 +33,7 @@ type SettingsPageProps = {
     setDarkBg: (bg: string) => void;
     onClose: () => void;
     onAuthExpired: () => void;
+    onSessionUpdate: (session: AuthSession) => void;
 };
 
 const formatDate = (value: string): string => {
@@ -52,10 +59,12 @@ export default function SettingsPage({
     darkBg,
     setDarkBg,
     onClose,
-    onAuthExpired
+    onAuthExpired,
+    onSessionUpdate
 }: SettingsPageProps) {
     const { t, i18n } = useTranslation();
     const currentLanguage = i18n.language?.startsWith('zh') ? 'zh' : 'en';
+    const [preferenceError, setPreferenceError] = useState<string | null>(null);
     const [memories, setMemories] = useState<UserMemory[]>([]);
     const [memoryDraft, setMemoryDraft] = useState('');
     const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
@@ -64,8 +73,34 @@ export default function SettingsPage({
     const [memorySaving, setMemorySaving] = useState(false);
     const [memoryError, setMemoryError] = useState<string | null>(null);
 
-    const handleLanguageChange = (lang: 'en' | 'zh') => {
-        i18n.changeLanguage(lang);
+    const persistPreferences = async (
+        updates: Partial<{
+            preferredLanguage: UserLanguage;
+            lightBackground: string;
+            darkBackground: string;
+        }>
+    ) => {
+        setPreferenceError(null);
+        try {
+            const nextSession = await updateCurrentUserPreferences({
+                preferredLanguage: updates.preferredLanguage ?? currentLanguage,
+                lightBackground: updates.lightBackground ?? lightBg,
+                darkBackground: updates.darkBackground ?? darkBg,
+            });
+            onSessionUpdate(nextSession);
+        } catch (error: unknown) {
+            if (error instanceof AuthSessionError) {
+                onAuthExpired();
+                return;
+            }
+
+            setPreferenceError(error instanceof Error ? error.message : String(error));
+        }
+    };
+
+    const handleLanguageChange = (lang: UserLanguage) => {
+        void i18n.changeLanguage(lang);
+        void persistPreferences({ preferredLanguage: lang });
     };
 
     const filteredMemories = useMemo(() => {
@@ -216,6 +251,11 @@ export default function SettingsPage({
                                 {t('chinese')}
                             </button>
                         </div>
+                        {preferenceError && (
+                            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300">
+                                {preferenceError}
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -245,6 +285,7 @@ export default function SettingsPage({
                                             onClick={() => {
                                                 setTheme('light');
                                                 setLightBg(bg);
+                                                void persistPreferences({ lightBackground: bg });
                                             }}
                                             className={`w-32 h-20 rounded-lg border-2 overflow-hidden transition-all ${
                                                 theme === 'light' && lightBg === bg
@@ -271,6 +312,7 @@ export default function SettingsPage({
                                             onClick={() => {
                                                 setTheme('dark');
                                                 setDarkBg(bg);
+                                                void persistPreferences({ darkBackground: bg });
                                             }}
                                             className={`w-32 h-20 rounded-lg border-2 overflow-hidden transition-all ${
                                                 theme === 'dark' && darkBg === bg
