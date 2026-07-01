@@ -53,6 +53,17 @@ export type ModelConfig = {
     updatedAt: string;
 };
 
+export type WebSearchConfig = {
+    id: number;
+    provider: 'tavily';
+    providerLabel: string;
+    hasApiKey: boolean;
+    apiKeyMask: string;
+    isEnabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+};
+
 export type AdminDashboard = {
     totalUsers: number;
     activeUsers: number;
@@ -131,6 +142,17 @@ type ModelConfigResponse = {
     updated_at: string;
 };
 
+type WebSearchConfigResponse = {
+    id: number;
+    provider: 'tavily';
+    provider_label: string;
+    has_api_key: boolean;
+    api_key_mask: string;
+    is_enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
 type AdminDashboardResponse = {
     total_users: number;
     active_users: number;
@@ -176,6 +198,11 @@ export type ModelConfigDraft = {
     baseUrl: string;
     apiPath: string;
     apiKey?: string | null;
+};
+
+export type WebSearchConfigDraft = {
+    apiKey?: string | null;
+    isEnabled: boolean;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -280,6 +307,21 @@ const normalizeModelConfig = (config: ModelConfigResponse): ModelConfig => {
         hasApiKey: config.has_api_key,
         apiKeyMask: config.api_key_mask,
         isActive: config.is_active,
+        createdAt: config.created_at,
+        updatedAt: config.updated_at,
+    };
+};
+
+const normalizeWebSearchConfig = (
+    config: WebSearchConfigResponse
+): WebSearchConfig => {
+    return {
+        id: config.id,
+        provider: config.provider,
+        providerLabel: config.provider_label,
+        hasApiKey: config.has_api_key,
+        apiKeyMask: config.api_key_mask,
+        isEnabled: config.is_enabled,
         createdAt: config.created_at,
         updatedAt: config.updated_at,
     };
@@ -467,6 +509,40 @@ export const updateModelConfig = async (
     await ensureOk(response);
 
     return normalizeModelConfig((await response.json()) as ModelConfigResponse);
+};
+
+export const fetchWebSearchConfig = async (): Promise<WebSearchConfig> => {
+    const response = await fetch(`${apiBaseUrl}/admin/web-search-config`, {
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return normalizeWebSearchConfig(
+        (await response.json()) as WebSearchConfigResponse
+    );
+};
+
+export const updateWebSearchConfig = async (
+    draft: WebSearchConfigDraft
+): Promise<WebSearchConfig> => {
+    const payload: Record<string, unknown> = {
+        is_enabled: draft.isEnabled,
+    };
+
+    if (draft.apiKey !== undefined) {
+        payload.api_key = draft.apiKey;
+    }
+
+    const response = await fetch(`${apiBaseUrl}/admin/web-search-config`, {
+        method: 'PUT',
+        headers: jsonAuthHeaders(),
+        body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+
+    return normalizeWebSearchConfig(
+        (await response.json()) as WebSearchConfigResponse
+    );
 };
 
 export const fetchRagStatus = async (): Promise<RagStatus> => {

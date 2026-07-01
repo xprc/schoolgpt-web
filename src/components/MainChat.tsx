@@ -37,7 +37,9 @@ import {
     getSourceFileKind,
     resolveThinkingDurationMs,
 } from '../utils/chatHelpers';
+import { parseSearchSourcesFromMarkdown } from '../utils/searchSources';
 import type { Message } from '../utils/types';
+import SearchSourceList from './SearchSourceList';
 
 type MainChatProps = {
     canWrite: boolean;
@@ -93,6 +95,20 @@ type SpeechRecognitionWindow = Window & {
 type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
+
+const AssistantMarkdownContent = ({ content }: { content: string }) => {
+    const parsedContent = parseSearchSourcesFromMarkdown(content);
+
+    return (
+        <>
+            <MarkdownContent
+                content={parsedContent.content}
+                citationSources={parsedContent.sources}
+            />
+            <SearchSourceList sources={parsedContent.sources} />
+        </>
+    );
+};
 
 const renderFileTypeIcon = (fileName: string) => {
     const fileKind = getSourceFileKind(fileName);
@@ -590,7 +606,7 @@ export default function MainChat({
                                                     ) : (
                                                         msg.content.trim() !== '' && (
                                                             <div className="min-w-0 text-[15px] text-gray-800 dark:text-gray-200 leading-[1.7] space-y-4 markdown-body dark:prose-invert [overflow-wrap:anywhere]">
-                                                                <MarkdownContent content={msg.content} />
+                                                                <AssistantMarkdownContent content={msg.content} />
                                                             </div>
                                                         )
                                                     )}

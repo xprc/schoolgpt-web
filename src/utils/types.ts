@@ -3,6 +3,14 @@ export type RagSource = {
     confidence: number;
 };
 
+export type SearchSource = {
+    index: number;
+    title: string;
+    url: string;
+    description: string;
+    host: string;
+};
+
 export type Message = {
     id: string;
     role: 'user' | 'ai';

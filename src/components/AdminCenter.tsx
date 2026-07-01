@@ -22,11 +22,13 @@ import {
     fetchModelConfig,
     fetchModelProviderOptions,
     fetchRagStatus,
+    fetchWebSearchConfig,
     rebuildRagDatabase,
     updateAdminConversationVisibility,
     updateAdminUser,
     updateAdminUserPassword,
     updateModelConfig,
+    updateWebSearchConfig,
     uploadRagFiles,
     type AdminConversation,
     type AdminDashboard,
@@ -36,9 +38,10 @@ import {
     type ModelProviderOption,
     type RagStatus,
     type UserType,
+    type WebSearchConfig,
 } from '../utils/apiAdmin';
 
-type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model' | 'rag';
+type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model' | 'web-search' | 'rag';
 
 type AdminCenterProps = {
     onClose: () => void;
@@ -66,6 +69,7 @@ const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
     { key: 'users', label: '用户设置', icon: Edit01Icon },
     { key: 'conversations', label: '对话管理', icon: Chat01Icon },
     { key: 'model', label: '模型配置', icon: BotIcon },
+    { key: 'web-search', label: '联网搜索', icon: Search01Icon },
     { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
 ];
 
@@ -120,12 +124,23 @@ const modelDraftFromConfig = (config: ModelConfig): {
     };
 };
 
+const webSearchDraftFromConfig = (config: WebSearchConfig): {
+    apiKey: string;
+    isEnabled: boolean;
+} => {
+    return {
+        apiKey: '',
+        isEnabled: config.isEnabled,
+    };
+};
+
 export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
     const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [conversations, setConversations] = useState<AdminConversation[]>([]);
     const [modelConfig, setModelConfig] = useState<ModelConfig | null>(null);
+    const [webSearchConfig, setWebSearchConfig] = useState<WebSearchConfig | null>(null);
     const [providerOptions, setProviderOptions] = useState<ModelProviderOption[]>([]);
     const [ragStatus, setRagStatus] = useState<RagStatus | null>(null);
     const [ragUploadFiles, setRagUploadFiles] = useState<File[]>([]);
@@ -147,6 +162,10 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         createdAt: '',
         updatedAt: '',
     }));
+    const [webSearchDraft, setWebSearchDraft] = useState({
+        apiKey: '',
+        isEnabled: true,
+    });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -171,6 +190,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 nextConversations,
                 nextConfig,
                 nextProviderOptions,
+                nextWebSearchConfig,
                 nextRagStatus,
             ] = await Promise.all([
                 fetchAdminDashboard(),
@@ -178,6 +198,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 fetchAdminConversations(),
                 fetchModelConfig(),
                 fetchModelProviderOptions(),
+                fetchWebSearchConfig(),
                 fetchRagStatus(),
             ]);
             setDashboard(nextDashboard);
@@ -185,8 +206,10 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             setConversations(nextConversations);
             setModelConfig(nextConfig);
             setProviderOptions(nextProviderOptions);
+            setWebSearchConfig(nextWebSearchConfig);
             setRagStatus(nextRagStatus);
             setModelDraft(modelDraftFromConfig(nextConfig));
+            setWebSearchDraft(webSearchDraftFromConfig(nextWebSearchConfig));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -357,6 +380,29 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             const nextDashboard = await fetchAdminDashboard();
             setDashboard(nextDashboard);
             setStatusMessage('模型配置已保存');
+        } catch (error: unknown) {
+            handleError(error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleWebSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setSaving(true);
+        setErrorMessage(null);
+        setStatusMessage(null);
+
+        try {
+            const updatedConfig = await updateWebSearchConfig({
+                apiKey: webSearchDraft.apiKey.trim()
+                    ? webSearchDraft.apiKey.trim()
+                    : undefined,
+                isEnabled: webSearchDraft.isEnabled,
+            });
+            setWebSearchConfig(updatedConfig);
+            setWebSearchDraft(webSearchDraftFromConfig(updatedConfig));
+            setStatusMessage('联网搜索配置已保存');
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -976,6 +1022,104 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         );
     };
 
+    const renderWebSearchConfig = () => {
+        return (
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <form
+                    onSubmit={handleWebSearchSubmit}
+                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                >
+                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                        联网搜索
+                    </h3>
+                    <div className="mt-5 space-y-4">
+                        <label className="block">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                Tavily API Key
+                            </span>
+                            <input
+                                type="password"
+                                value={webSearchDraft.apiKey}
+                                placeholder={webSearchConfig?.hasApiKey
+                                    ? `已保存 ${webSearchConfig.apiKeyMask}`
+                                    : '请输入 Tavily API Key'}
+                                onChange={(event) =>
+                                    setWebSearchDraft((prev) => ({
+                                        ...prev,
+                                        apiKey: event.target.value,
+                                    }))
+                                }
+                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
+                            />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={webSearchDraft.isEnabled}
+                                onChange={(event) =>
+                                    setWebSearchDraft((prev) => ({
+                                        ...prev,
+                                        isEnabled: event.target.checked,
+                                    }))
+                                }
+                                className="h-4 w-4 rounded border-gray-300"
+                            />
+                            启用联网搜索
+                        </label>
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                    >
+                        <Tick02Icon size={16} />
+                        保存配置
+                    </button>
+                </form>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
+                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                        当前生效
+                    </h3>
+                    <dl className="mt-4 space-y-3 text-sm">
+                        <div>
+                            <dt className="text-gray-500 dark:text-gray-400">供应商</dt>
+                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                                {webSearchConfig?.providerLabel ?? '-'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-gray-500 dark:text-gray-400">状态</dt>
+                            <dd className={webSearchConfig?.isEnabled
+                                ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
+                                : 'mt-1 font-medium text-gray-500 dark:text-gray-300'}
+                            >
+                                {webSearchConfig?.isEnabled ? '启用' : '停用'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-gray-500 dark:text-gray-400">API Key</dt>
+                            <dd className={webSearchConfig?.hasApiKey
+                                ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
+                                : 'mt-1 font-medium text-red-600 dark:text-red-300'}
+                            >
+                                {webSearchConfig?.hasApiKey
+                                    ? webSearchConfig.apiKeyMask
+                                    : '未配置'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-gray-500 dark:text-gray-400">更新时间</dt>
+                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                                {formatDate(webSearchConfig?.updatedAt ?? null)}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        );
+    };
+
     const renderRag = () => {
         if (!ragStatus) {
             return null;
@@ -1174,6 +1318,10 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             return renderRag();
         }
 
+        if (activeTab === 'web-search') {
+            return renderWebSearchConfig();
+        }
+
         return renderModelConfig();
     };
 
@@ -1185,7 +1333,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         Admin 管理中心
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        数据、用户、对话、模型和 RAG 配置
+                        数据、用户、对话、模型、联网搜索和 RAG 配置
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
