@@ -92,7 +92,7 @@ export const getSourceFileKind = (fileName: string): SourceFileKind => {
     const extension = getFileExtension(fileName);
 
     if (extension === 'pdf') return 'pdf';
-    if (extension === 'txt' || extension === 'md') return 'text';
+    if (extension === 'txt') return 'text';
     if (extension === 'csv') return 'csv';
     if (extension === 'doc' || extension === 'docx') return 'document';
     if (extension === 'xls' || extension === 'xlsx') return 'spreadsheet';

@@ -17,6 +17,7 @@ type ConversationMessageResponse = {
         file_id?: number;
         file_name: string;
         chunk_index?: number | null;
+        page_number?: number | null;
         snippet?: string;
         confidence: number;
     }>;
@@ -123,6 +124,7 @@ const normalizeRagSources = (
             const confidence = Number(source.confidence ?? 0);
             const fileId = Number(source.file_id);
             const chunkIndex = Number(source.chunk_index);
+            const pageNumber = Number(source.page_number);
             const normalizedSource: RagSource = {
                 fileName: source.file_name,
                 confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
@@ -132,6 +134,9 @@ const normalizeRagSources = (
             }
             if (Number.isFinite(chunkIndex)) {
                 normalizedSource.chunkIndex = chunkIndex;
+            }
+            if (Number.isFinite(pageNumber)) {
+                normalizedSource.pageNumber = pageNumber;
             }
             if (typeof source.snippet === 'string' && source.snippet.trim()) {
                 normalizedSource.snippet = source.snippet;
@@ -233,6 +238,7 @@ export const saveRemoteConversation = async (
                     file_id: source.fileId,
                     file_name: source.fileName,
                     chunk_index: source.chunkIndex,
+                    page_number: source.pageNumber,
                     snippet: source.snippet,
                     confidence: source.confidence,
                 })),

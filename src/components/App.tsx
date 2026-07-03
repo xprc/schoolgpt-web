@@ -347,6 +347,7 @@ export default function App() {
         setRagFileOpenRequest({
             fileId: source.fileId,
             chunkIndex: source.chunkIndex ?? null,
+            pageNumber: source.pageNumber ?? null,
             snippet: source.snippet,
             nonce: Date.now(),
         });

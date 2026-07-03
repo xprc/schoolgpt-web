@@ -40,6 +40,7 @@ import {
     type UserType,
     type WebSearchConfig,
 } from '../utils/apiAdmin';
+import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 
 type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model' | 'web-search' | 'rag';
 
@@ -73,7 +74,7 @@ const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
     { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
 ];
 
-const activeRagFileStatuses = new Set(['pending', 'converting', 'indexing']);
+const activeRagFileStatuses = new Set(['pending', 'extracting', 'rendering', 'indexing']);
 
 const isRagFileProcessing = (status: string): boolean => {
     return activeRagFileStatuses.has(status);
@@ -88,8 +89,12 @@ const ragFileStatusLabel = (status: string, indexed: boolean): string => {
         return '待处理';
     }
 
-    if (status === 'converting') {
-        return '转换中';
+    if (status === 'extracting') {
+        return '提取中';
+    }
+
+    if (status === 'rendering') {
+        return '生成预览';
     }
 
     if (status === 'indexing') {
@@ -1244,6 +1249,26 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     上传
                                 </button>
                             </div>
+                            {ragUploadFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {ragUploadFiles.map((file, index) => (
+                                        <span
+                                            key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                                            className="flex max-w-full items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300"
+                                        >
+                                            {renderFileTypeIcon(file.name, {
+                                                size: 14,
+                                            })}
+                                            <span className="max-w-[12rem] truncate font-medium">
+                                                {file.name}
+                                            </span>
+                                            <span className="shrink-0 text-gray-400">
+                                                {formatFileSize(file.size)}
+                                            </span>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[780px] text-left text-sm">
@@ -1270,17 +1295,24 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     ) : ragStatus.files.map((file) => (
                                         <tr key={file.id}>
                                             <td className="px-4 py-3">
-                                                <div className="max-w-[320px] truncate font-medium text-gray-950 dark:text-white">
-                                                    {file.name}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {file.sha256 ? file.sha256.slice(0, 12) : '-'}
-                                                </div>
-                                                {file.errorMessage && (
-                                                    <div className="mt-1 max-w-[320px] truncate text-xs text-red-600 dark:text-red-300">
-                                                        {file.errorMessage}
+                                                <div className="flex max-w-[320px] items-start gap-2">
+                                                    {renderFileTypeIcon(file.name, {
+                                                        className: 'mt-0.5 shrink-0',
+                                                    })}
+                                                    <div className="min-w-0">
+                                                        <div className="truncate font-medium text-gray-950 dark:text-white">
+                                                            {file.name}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            {file.sha256 ? file.sha256.slice(0, 12) : '-'}
+                                                        </div>
+                                                        {file.errorMessage && (
+                                                            <div className="mt-1 truncate text-xs text-red-600 dark:text-red-300">
+                                                                {file.errorMessage}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                                                 {formatFileSize(file.size)}

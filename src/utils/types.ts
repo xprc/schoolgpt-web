@@ -2,6 +2,7 @@ export type RagSource = {
     fileId?: number;
     fileName: string;
     chunkIndex?: number | null;
+    pageNumber?: number | null;
     snippet?: string;
     confidence: number;
 };

@@ -6,25 +6,13 @@ import {
     ArrowUp01Icon,
     Chat01Icon,
     Copy01Icon,
-    Csv01Icon,
-    Doc01Icon,
-    DocumentCodeIcon,
     Edit01Icon,
-    File01Icon,
-    FileAudioIcon,
-    FileVideoIcon,
-    FileZipIcon,
-    GoogleSheetIcon,
-    Image01Icon,
     Mic01Icon,
     MicOff01Icon,
     MoreVerticalIcon,
-    Pdf01Icon,
-    Ppt01Icon,
     Refresh01Icon,
     ThumbsDownIcon,
     ThumbsUpIcon,
-    Txt01Icon,
     VolumeMute01Icon,
     VolumeUpIcon
 } from 'hugeicons-react';
@@ -34,9 +22,9 @@ import {
     createMessageId,
     formatConfidence,
     formatThinkingDuration,
-    getSourceFileKind,
     resolveThinkingDurationMs,
 } from '../utils/chatHelpers';
+import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 import { parseSearchSourcesFromMarkdown } from '../utils/searchSources';
 import type { Message, RagSource } from '../utils/types';
 import SearchSourceList from './SearchSourceList';
@@ -96,6 +84,7 @@ type SpeechRecognitionWindow = Window & {
 type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
+const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 80;
 
 type RagSourceGroup = {
     key: string;
@@ -118,30 +107,6 @@ const AssistantMarkdownContent = ({ content }: { content: string }) => {
             <SearchSourceList sources={parsedContent.sources} />
         </>
     );
-};
-
-const renderFileTypeIcon = (fileName: string) => {
-    const fileKind = getSourceFileKind(fileName);
-    const className = 'shrink-0 text-gray-500 dark:text-gray-300';
-    const props = {
-        size: 14,
-        className,
-        'aria-hidden': true,
-    };
-
-    if (fileKind === 'pdf') return <Pdf01Icon {...props} />;
-    if (fileKind === 'text') return <Txt01Icon {...props} />;
-    if (fileKind === 'csv') return <Csv01Icon {...props} />;
-    if (fileKind === 'document') return <Doc01Icon {...props} />;
-    if (fileKind === 'spreadsheet') return <GoogleSheetIcon {...props} />;
-    if (fileKind === 'presentation') return <Ppt01Icon {...props} />;
-    if (fileKind === 'image') return <Image01Icon {...props} />;
-    if (fileKind === 'archive') return <FileZipIcon {...props} />;
-    if (fileKind === 'audio') return <FileAudioIcon {...props} />;
-    if (fileKind === 'video') return <FileVideoIcon {...props} />;
-    if (fileKind === 'code') return <DocumentCodeIcon {...props} />;
-
-    return <File01Icon {...props} />;
 };
 
 const ragSourceGroupKey = (source: RagSource): string => {
@@ -210,6 +175,10 @@ const formatAiMessageTime = (value: string | undefined, language: string): strin
     }).format(date);
 };
 
+const isNearScrollBottom = (element: HTMLElement): boolean => (
+    element.scrollHeight - element.scrollTop - element.clientHeight <= AUTO_SCROLL_BOTTOM_THRESHOLD_PX
+);
+
 export default function MainChat({
     canWrite,
     messages,
@@ -226,7 +195,9 @@ export default function MainChat({
     const [isRecording, setIsRecording] = useState(false);
     const [speakingId, setSpeakingId] = useState<string | null>(null);
     const [nowMs, setNowMs] = useState(() => Date.now());
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const shouldFollowScrollRef = useRef(true);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
     useEffect(() => {
@@ -349,11 +320,22 @@ export default function MainChat({
     };
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    };
+
+    const updateShouldFollowScroll = () => {
+        const scrollContainer = scrollContainerRef.current;
+        if (!scrollContainer) {
+            return;
+        }
+
+        shouldFollowScrollRef.current = isNearScrollBottom(scrollContainer);
     };
 
     useEffect(() => {
-        scrollToBottom();
+        if (shouldFollowScrollRef.current) {
+            scrollToBottom();
+        }
     }, [messages]);
 
     const submitMessage = async (query: string, currentMessages: Message[]) => {
@@ -491,7 +473,11 @@ export default function MainChat({
     };
 
     return (
-        <div className="flex-1 min-w-0 h-full bg-transparent overflow-y-auto custom-scrollbar transition-colors duration-200">
+        <div
+            ref={scrollContainerRef}
+            onScroll={updateShouldFollowScroll}
+            className="flex-1 min-w-0 h-full bg-transparent overflow-y-auto custom-scrollbar transition-colors duration-200"
+        >
             <div className="min-h-full flex flex-col">
             <div className="flex-1 px-4 sm:px-8 pt-24 sm:pt-24 pb-6 sm:pb-8 relative bg-transparent">
                 <div className="max-w-4xl mx-auto space-y-8 sm:space-y-10">
@@ -686,7 +672,9 @@ export default function MainChat({
                                                                             title={typeof sourceGroup.primarySource.fileId === 'number' ? sourceGroup.primarySource.snippet || sourceGroup.fileName : '旧来源不可打开'}
                                                                         >
                                                                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#5b6ef5] dark:bg-blue-400/10 dark:text-blue-200">
-                                                                                {renderFileTypeIcon(sourceGroup.fileName)}
+                                                                                {renderFileTypeIcon(sourceGroup.fileName, {
+                                                                                    size: 14,
+                                                                                })}
                                                                             </span>
                                                                             <span className="min-w-0 flex-1">
                                                                                 <span className="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -713,6 +701,9 @@ export default function MainChat({
                                                                                     >
                                                                                         <span className="mb-1 flex items-center justify-between gap-2">
                                                                                             <span className="truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                                                                                {typeof source.pageNumber === 'number'
+                                                                                                    ? `第 ${source.pageNumber} 页 · `
+                                                                                                    : ''}
                                                                                                 片段 {typeof source.chunkIndex === 'number' ? source.chunkIndex + 1 : sourceIndex + 1}
                                                                                             </span>
                                                                                             <span className="shrink-0 text-xs font-semibold text-[#5b6ef5] dark:text-blue-300">

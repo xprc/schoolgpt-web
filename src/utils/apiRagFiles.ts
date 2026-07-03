@@ -16,8 +16,8 @@ export type RagFileSummary = {
 };
 
 export type RagFileDetail = RagFileSummary & {
-    markdown: string;
     chunkIndex: number | null;
+    pageNumber: number | null;
     snippet: string | null;
 };
 
@@ -34,8 +34,8 @@ type RagFileSummaryResponse = {
 };
 
 type RagFileDetailResponse = RagFileSummaryResponse & {
-    markdown: string;
     chunk_index: number | null;
+    page_number: number | null;
     snippet: string | null;
 };
 
@@ -96,8 +96,8 @@ const normalizeSummary = (file: RagFileSummaryResponse): RagFileSummary => {
 const normalizeDetail = (file: RagFileDetailResponse): RagFileDetail => {
     return {
         ...normalizeSummary(file),
-        markdown: file.markdown,
         chunkIndex: file.chunk_index,
+        pageNumber: file.page_number,
         snippet: file.snippet,
     };
 };
@@ -130,4 +130,13 @@ export const fetchRagFile = async (
     await ensureOk(response);
 
     return normalizeDetail((await response.json()) as RagFileDetailResponse);
+};
+
+export const fetchRagFilePreview = async (fileId: number): Promise<Blob> => {
+    const response = await fetch(`${apiBaseUrl}/rag/files/${fileId}/preview`, {
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return response.blob();
 };

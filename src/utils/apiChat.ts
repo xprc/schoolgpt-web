@@ -106,6 +106,7 @@ const normalizeRagSources = (value: unknown): RagSource[] => {
             const confidence = Number(source.confidence ?? 0);
             const fileId = Number(source.file_id);
             const chunkIndex = Number(source.chunk_index);
+            const pageNumber = Number(source.page_number);
             const snippet = typeof source.snippet === 'string' ? source.snippet : '';
             const normalizedSource: RagSource = {
                 fileName: source.file_name,
@@ -116,6 +117,9 @@ const normalizeRagSources = (value: unknown): RagSource[] => {
             }
             if (Number.isFinite(chunkIndex)) {
                 normalizedSource.chunkIndex = chunkIndex;
+            }
+            if (Number.isFinite(pageNumber)) {
+                normalizedSource.pageNumber = pageNumber;
             }
             if (snippet) {
                 normalizedSource.snippet = snippet;
@@ -163,6 +167,7 @@ export const streamChat = async (
                     file_id: source.fileId,
                     file_name: source.fileName,
                     chunk_index: source.chunkIndex,
+                    page_number: source.pageNumber,
                     snippet: source.snippet,
                     confidence: source.confidence,
                 })),
