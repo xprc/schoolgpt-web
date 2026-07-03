@@ -14,7 +14,10 @@ type ConversationMessageResponse = {
     role: 'user' | 'ai';
     content: string;
     rag_sources?: Array<{
+        file_id?: number;
         file_name: string;
+        chunk_index?: number | null;
+        snippet?: string;
         confidence: number;
     }>;
     reasoning_content?: string | null;
@@ -116,12 +119,25 @@ const normalizeRagSources = (
     }
 
     return sources
-        .map((source) => {
+        .map((source): RagSource => {
             const confidence = Number(source.confidence ?? 0);
-            return {
+            const fileId = Number(source.file_id);
+            const chunkIndex = Number(source.chunk_index);
+            const normalizedSource: RagSource = {
                 fileName: source.file_name,
                 confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
             };
+            if (Number.isFinite(fileId)) {
+                normalizedSource.fileId = fileId;
+            }
+            if (Number.isFinite(chunkIndex)) {
+                normalizedSource.chunkIndex = chunkIndex;
+            }
+            if (typeof source.snippet === 'string' && source.snippet.trim()) {
+                normalizedSource.snippet = source.snippet;
+            }
+
+            return normalizedSource;
         })
         .filter((source) => source.fileName.trim().length > 0);
 };
@@ -214,7 +230,10 @@ export const saveRemoteConversation = async (
                 role: message.role,
                 content: message.content,
                 rag_sources: (message.ragSources ?? []).map((source) => ({
+                    file_id: source.fileId,
                     file_name: source.fileName,
+                    chunk_index: source.chunkIndex,
+                    snippet: source.snippet,
                     confidence: source.confidence,
                 })),
                 reasoning_content: message.reasoningContent ?? null,

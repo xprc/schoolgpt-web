@@ -98,16 +98,30 @@ const normalizeRagSources = (value: unknown): RagSource[] => {
     }
 
     return value
-        .map((source) => {
+        .map((source): RagSource | null => {
             if (!isRecord(source) || typeof source.file_name !== 'string') {
                 return null;
             }
 
             const confidence = Number(source.confidence ?? 0);
-            return {
+            const fileId = Number(source.file_id);
+            const chunkIndex = Number(source.chunk_index);
+            const snippet = typeof source.snippet === 'string' ? source.snippet : '';
+            const normalizedSource: RagSource = {
                 fileName: source.file_name,
                 confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0,
             };
+            if (Number.isFinite(fileId)) {
+                normalizedSource.fileId = fileId;
+            }
+            if (Number.isFinite(chunkIndex)) {
+                normalizedSource.chunkIndex = chunkIndex;
+            }
+            if (snippet) {
+                normalizedSource.snippet = snippet;
+            }
+
+            return normalizedSource;
         })
         .filter((source): source is RagSource => source !== null);
 };
@@ -146,7 +160,10 @@ export const streamChat = async (
                 role: message.role,
                 content: message.content,
                 rag_sources: (message.ragSources ?? []).map((source) => ({
+                    file_id: source.fileId,
                     file_name: source.fileName,
+                    chunk_index: source.chunkIndex,
+                    snippet: source.snippet,
                     confidence: source.confidence,
                 })),
             })),

@@ -38,7 +38,7 @@ import {
     resolveThinkingDurationMs,
 } from '../utils/chatHelpers';
 import { parseSearchSourcesFromMarkdown } from '../utils/searchSources';
-import type { Message } from '../utils/types';
+import type { Message, RagSource } from '../utils/types';
 import SearchSourceList from './SearchSourceList';
 
 type MainChatProps = {
@@ -48,6 +48,7 @@ type MainChatProps = {
     ensureConversationId: () => string | null;
     onMessagesCommitted: (conversationId: string, messages: Message[]) => Promise<void>;
     onAuthExpired: () => void;
+    onOpenRagSource: (source: RagSource) => void;
 };
 
 type SpeechRecognitionAlternativeLike = {
@@ -96,6 +97,15 @@ type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
 
+type RagSourceGroup = {
+    key: string;
+    fileName: string;
+    count: number;
+    confidence: number;
+    primarySource: RagSource;
+    sources: RagSource[];
+};
+
 const AssistantMarkdownContent = ({ content }: { content: string }) => {
     const parsedContent = parseSearchSourcesFromMarkdown(content);
 
@@ -134,6 +144,47 @@ const renderFileTypeIcon = (fileName: string) => {
     return <File01Icon {...props} />;
 };
 
+const ragSourceGroupKey = (source: RagSource): string => {
+    return typeof source.fileId === 'number'
+        ? `file-${source.fileId}`
+        : `name-${source.fileName}`;
+};
+
+const groupRagSources = (sources: RagSource[]): RagSourceGroup[] => {
+    const groups = new Map<string, RagSourceGroup>();
+
+    sources.forEach((source) => {
+        const key = ragSourceGroupKey(source);
+        const existingGroup = groups.get(key);
+
+        if (!existingGroup) {
+            groups.set(key, {
+                key,
+                fileName: source.fileName,
+                count: 1,
+                confidence: source.confidence,
+                primarySource: source,
+                sources: [source],
+            });
+            return;
+        }
+
+        existingGroup.count += 1;
+        existingGroup.sources.push(source);
+        if (source.confidence > existingGroup.confidence) {
+            existingGroup.confidence = source.confidence;
+            existingGroup.primarySource = source;
+        }
+    });
+
+    return Array.from(groups.values())
+        .map((group) => ({
+            ...group,
+            sources: [...group.sources].sort((a, b) => b.confidence - a.confidence),
+        }))
+        .sort((a, b) => b.confidence - a.confidence);
+};
+
 const padTimePart = (value: number): string => value.toString().padStart(2, '0');
 
 const formatAiMessageTime = (value: string | undefined, language: string): string => {
@@ -166,6 +217,7 @@ export default function MainChat({
     ensureConversationId,
     onMessagesCommitted,
     onAuthExpired,
+    onOpenRagSource,
 }: MainChatProps) {
     const { t, i18n } = useTranslation();
     const [input, setInput] = useState('');
@@ -612,23 +664,69 @@ export default function MainChat({
                                                     )}
                                                     {(msg.ragSources?.length ?? 0) > 0 && (
                                                         <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
-                                                            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                                RAG 来源
+                                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                    RAG 来源
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 dark:text-gray-500">
+                                                                    {groupRagSources(msg.ragSources ?? []).length} 个文件 · {(msg.ragSources ?? []).length} 个片段
+                                                                </div>
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {msg.ragSources?.map((source) => (
-                                                                    <span
-                                                                        key={source.fileName}
-                                                                        className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white/60 px-2.5 py-1 text-xs text-gray-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200"
+                                                            <div className="grid gap-2">
+                                                                {groupRagSources(msg.ragSources ?? []).map((sourceGroup) => (
+                                                                    <div
+                                                                        key={sourceGroup.key}
+                                                                        className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white/60 text-gray-700 shadow-sm shadow-white/40 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-200 dark:shadow-none"
                                                                     >
-                                                                        {renderFileTypeIcon(source.fileName)}
-                                                                        <span className="max-w-[220px] truncate">
-                                                                            {source.fileName}
-                                                                        </span>
-                                                                        <span className="shrink-0 font-semibold text-[#5b6ef5] dark:text-blue-300">
-                                                                            {formatConfidence(source.confidence)}
-                                                                        </span>
-                                                                    </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => onOpenRagSource(sourceGroup.primarySource)}
+                                                                            disabled={typeof sourceGroup.primarySource.fileId !== 'number'}
+                                                                            className="flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-white/10"
+                                                                            title={typeof sourceGroup.primarySource.fileId === 'number' ? sourceGroup.primarySource.snippet || sourceGroup.fileName : '旧来源不可打开'}
+                                                                        >
+                                                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#5b6ef5] dark:bg-blue-400/10 dark:text-blue-200">
+                                                                                {renderFileTypeIcon(sourceGroup.fileName)}
+                                                                            </span>
+                                                                            <span className="min-w-0 flex-1">
+                                                                                <span className="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">
+                                                                                    {sourceGroup.fileName}
+                                                                                </span>
+                                                                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                                                                    {sourceGroup.count} 个相关片段
+                                                                                </span>
+                                                                            </span>
+                                                                            <span className="shrink-0 rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-semibold text-[#4a5ce0] dark:bg-blue-400/10 dark:text-blue-200">
+                                                                                {formatConfidence(sourceGroup.confidence)}
+                                                                            </span>
+                                                                        </button>
+                                                                        <div className="border-t border-gray-200/70 bg-white/35 px-2 py-2 dark:border-white/10 dark:bg-black/10">
+                                                                            <div className="grid gap-1.5 sm:grid-cols-2">
+                                                                                {sourceGroup.sources.map((source, sourceIndex) => (
+                                                                                    <button
+                                                                                        key={`${sourceGroup.key}-${source.chunkIndex ?? sourceIndex}`}
+                                                                                        type="button"
+                                                                                        onClick={() => onOpenRagSource(source)}
+                                                                                        disabled={typeof source.fileId !== 'number'}
+                                                                                        className="min-w-0 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-white/10"
+                                                                                        title={typeof source.fileId === 'number' ? source.snippet || source.fileName : '旧来源不可打开'}
+                                                                                    >
+                                                                                        <span className="mb-1 flex items-center justify-between gap-2">
+                                                                                            <span className="truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                                                                                片段 {typeof source.chunkIndex === 'number' ? source.chunkIndex + 1 : sourceIndex + 1}
+                                                                                            </span>
+                                                                                            <span className="shrink-0 text-xs font-semibold text-[#5b6ef5] dark:text-blue-300">
+                                                                                                {formatConfidence(source.confidence)}
+                                                                                            </span>
+                                                                                        </span>
+                                                                                        <span className="line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                                                                            {source.snippet || '点击查看该片段'}
+                                                                                        </span>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 ))}
                                                             </div>
                                                         </div>

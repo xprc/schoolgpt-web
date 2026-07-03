@@ -75,10 +75,13 @@ export type AdminDashboard = {
 };
 
 export type RagKnowledgeFile = {
+    id: number;
     name: string;
     size: number;
     modifiedAt: string;
-    md5: string;
+    sha256: string;
+    status: string;
+    errorMessage: string | null;
     indexed: boolean;
     chunkCount: number;
 };
@@ -164,10 +167,13 @@ type AdminDashboardResponse = {
 };
 
 type RagKnowledgeFileResponse = {
+    id: number;
     name: string;
     size: number;
     modified_at: string;
-    md5: string;
+    sha256: string;
+    status: string;
+    error_message: string | null;
     indexed: boolean;
     chunk_count: number;
 };
@@ -341,10 +347,13 @@ const normalizeDashboard = (dashboard: AdminDashboardResponse): AdminDashboard =
 
 const normalizeRagFile = (file: RagKnowledgeFileResponse): RagKnowledgeFile => {
     return {
+        id: file.id,
         name: file.name,
         size: file.size,
         modifiedAt: file.modified_at,
-        md5: file.md5,
+        sha256: file.sha256,
+        status: file.status,
+        errorMessage: file.error_message,
         indexed: file.indexed,
         chunkCount: file.chunk_count,
     };
@@ -570,8 +579,8 @@ export const uploadRagFiles = async (files: File[]): Promise<RagStatus> => {
     return normalizeRagStatus((await response.json()) as RagStatusResponse);
 };
 
-export const deleteRagFile = async (fileName: string): Promise<RagStatus> => {
-    const response = await fetch(`${apiBaseUrl}/admin/rag/files/${encodeURIComponent(fileName)}`, {
+export const deleteRagFile = async (fileId: number): Promise<RagStatus> => {
+    const response = await fetch(`${apiBaseUrl}/admin/rag/files/${fileId}`, {
         method: 'DELETE',
         headers: authHeaders(),
     });

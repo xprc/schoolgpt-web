@@ -56,12 +56,15 @@ import type {
     ConversationShareScope,
     ConversationSummary,
     Message,
+    RagSource,
 } from '../utils/types';
+import type { RagFileOpenRequest } from './RagFileBrowser';
 
 const FirstRunSetupPage = lazy(() => import('./FirstRunSetupPage'));
 const LoginPage = lazy(() => import('./LoginPage'));
 const MainChat = lazy(() => import('./MainChat'));
 const ProfilePanel = lazy(() => import('./ProfilePanel'));
+const RagFileBrowser = lazy(() => import('./RagFileBrowser'));
 
 const defaultConversationTitle = '新对话';
 const draftConversationId = '';
@@ -221,6 +224,8 @@ export default function App() {
     const clientCreatedConversationIdsRef = useRef(new Set<string>());
     const [avatarUrl, setAvatarUrl] = useState(() => getGravatarFallbackAvatarUrl(''));
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+    const [ragFileOpenRequest, setRagFileOpenRequest] = useState<RagFileOpenRequest | null>(null);
 
     useEffect(() => {
         if (session?.user.preferredLanguage) {
@@ -321,7 +326,31 @@ export default function App() {
         setSearchQuery('');
         setDebouncedSearchQuery('');
         setSyncError(null);
+        setIsFileBrowserOpen(false);
+        setRagFileOpenRequest(null);
         clientCreatedConversationIdsRef.current.clear();
+    }, []);
+
+    const handleOpenFiles = useCallback(() => {
+        setRagFileOpenRequest({
+            nonce: Date.now(),
+        });
+        setIsFileBrowserOpen(true);
+        setIsSidebarOpen(false);
+    }, []);
+
+    const handleOpenRagSource = useCallback((source: RagSource) => {
+        if (typeof source.fileId !== 'number') {
+            return;
+        }
+
+        setRagFileOpenRequest({
+            fileId: source.fileId,
+            chunkIndex: source.chunkIndex ?? null,
+            snippet: source.snippet,
+            nonce: Date.now(),
+        });
+        setIsFileBrowserOpen(true);
     }, []);
 
     const refreshConversationList = useCallback(async () => {
@@ -1330,12 +1359,16 @@ export default function App() {
                             </div>
                             <span className="text-xs font-bold">{conversationSummaries.length}</span>
                         </div>
-                        <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white">
+                        <button
+                            type="button"
+                            onClick={handleOpenFiles}
+                            className="flex w-full items-center justify-between px-4 py-1.5 rounded-r-full text-left text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white"
+                        >
                             <div className="flex items-center gap-3">
                                 <Folder01Icon size={16} />
                                 <span className="text-sm">{t('files')}</span>
                             </div>
-                        </div>
+                        </button>
                         <div className="flex items-center justify-between px-4 py-1.5 rounded-r-full text-gray-700 hover:bg-black/5 hover:text-gray-950 cursor-pointer dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white sm:text-white/80 sm:hover:bg-white/10 sm:hover:text-white">
                             <div className="flex items-center gap-3">
                                 <BotIcon size={16} />
@@ -1399,6 +1432,7 @@ export default function App() {
                                     ensureConversationId={ensureCurrentConversationId}
                                     onMessagesCommitted={handleMessagesCommitted}
                                     onAuthExpired={handleLogout}
+                                    onOpenRagSource={handleOpenRagSource}
                                 />
                             </Suspense>
                         ) : (
@@ -1409,6 +1443,14 @@ export default function App() {
                     </div>
                 </div>
             </div>
+            <Suspense fallback={null}>
+                <RagFileBrowser
+                    isOpen={isFileBrowserOpen}
+                    openRequest={ragFileOpenRequest}
+                    onClose={() => setIsFileBrowserOpen(false)}
+                    onAuthExpired={handleLogout}
+                />
+            </Suspense>
         </div>
     );
 }

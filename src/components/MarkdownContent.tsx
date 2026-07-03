@@ -10,12 +10,94 @@ import type { SearchSource } from '../utils/types';
 type MarkdownContentProps = {
     content: string;
     citationSources?: SearchSource[];
+    preserveSoftBreaks?: boolean;
+};
+
+type HastNode = {
+    type: string;
+    tagName?: string;
+    value?: string;
+    properties?: Record<string, unknown>;
+    children?: HastNode[];
 };
 
 const normalizeLatexDelimiters = (content: string) =>
     content
         .replace(/\\\[([\s\S]*?)\\\]/g, (_match, math: string) => `$$${math}$$`)
         .replace(/\\\(([\s\S]*?)\\\)/g, (_match, math: string) => `$${math}$`);
+
+const htmlBreakPattern = /(<br\s*\/?>)/gi;
+const softBreakPattern = /(<br\s*\/?>|\r\n|\r|\n)/gi;
+const htmlBreakTokenPattern = /^<br\s*\/?>$/i;
+const nonBreakingTags = new Set(['code', 'pre', 'script', 'style']);
+
+const createBreakNode = (): HastNode => ({
+    type: 'element',
+    tagName: 'br',
+    properties: {},
+    children: [],
+});
+
+const isBreakToken = (token: string): boolean => {
+    return htmlBreakTokenPattern.test(token)
+        || token === '\n'
+        || token === '\r'
+        || token === '\r\n';
+};
+
+const splitTextWithBreaks = (value: string, breakPattern: RegExp): HastNode[] => {
+    breakPattern.lastIndex = 0;
+    const tokens = value.split(breakPattern);
+    const nodes: HastNode[] = [];
+
+    tokens.forEach((token) => {
+        if (!token) {
+            return;
+        }
+
+        if (isBreakToken(token)) {
+            nodes.push(createBreakNode());
+            return;
+        }
+
+        nodes.push({
+            type: 'text',
+            value: token,
+        });
+    });
+
+    return nodes.length > 0 ? nodes : [{ type: 'text', value }];
+};
+
+const createTextBreakPlugin = (preserveSoftBreaks: boolean) => {
+    const breakPattern = preserveSoftBreaks ? softBreakPattern : htmlBreakPattern;
+
+    const visit = (node: HastNode, parentTagName = '') => {
+        if (!node.children || nonBreakingTags.has(parentTagName)) {
+            return;
+        }
+
+        node.children = node.children.flatMap((child) => {
+            if (
+                ['text', 'raw', 'html'].includes(child.type)
+                && typeof child.value === 'string'
+            ) {
+                breakPattern.lastIndex = 0;
+                if (!breakPattern.test(child.value)) {
+                    breakPattern.lastIndex = 0;
+                    return [child];
+                }
+
+                return splitTextWithBreaks(child.value, breakPattern);
+            }
+
+            visit(child, child.tagName || '');
+            return [child];
+        });
+    };
+
+    return (tree: HastNode) => visit(tree);
+};
 
 const getTextContent = (children: ReactNode): string => {
     if (typeof children === 'string' || typeof children === 'number') {
@@ -104,6 +186,7 @@ const MarkdownLink = ({
 export default function MarkdownContent({
     content,
     citationSources = [],
+    preserveSoftBreaks = false,
 }: MarkdownContentProps) {
     return (
         <ReactMarkdown
@@ -113,8 +196,8 @@ export default function MarkdownContent({
                 ),
                 code: CodeBlock,
             }}
-            rehypePlugins={[rehypeKatex]}
             remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[createTextBreakPlugin(preserveSoftBreaks), rehypeKatex]}
         >
             {normalizeLatexDelimiters(content)}
         </ReactMarkdown>

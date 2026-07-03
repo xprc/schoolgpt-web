@@ -73,6 +73,48 @@ const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
     { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
 ];
 
+const activeRagFileStatuses = new Set(['pending', 'converting', 'indexing']);
+
+const isRagFileProcessing = (status: string): boolean => {
+    return activeRagFileStatuses.has(status);
+};
+
+const ragFileStatusLabel = (status: string, indexed: boolean): string => {
+    if (status === 'failed') {
+        return '处理失败';
+    }
+
+    if (status === 'pending') {
+        return '待处理';
+    }
+
+    if (status === 'converting') {
+        return '转换中';
+    }
+
+    if (status === 'indexing') {
+        return '入库中';
+    }
+
+    return indexed ? '已入库' : '待生成';
+};
+
+const ragFileStatusBadgeClass = (status: string, indexed: boolean): string => {
+    if (status === 'failed') {
+        return 'rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200';
+    }
+
+    if (indexed) {
+        return 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200';
+    }
+
+    if (isRagFileProcessing(status)) {
+        return 'rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-200';
+    }
+
+    return 'rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
+};
+
 const formatDate = (value: string | null): string => {
     if (!value) {
         return '-';
@@ -220,6 +262,31 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     useEffect(() => {
         void refreshAll();
     }, []);
+
+    useEffect(() => {
+        const hasActiveRagTask = ragStatus?.files.some((file) => {
+            return isRagFileProcessing(file.status);
+        }) ?? false;
+
+        if (activeTab !== 'rag' || !hasActiveRagTask) {
+            return undefined;
+        }
+
+        const timer = window.setInterval(() => {
+            fetchRagStatus()
+                .then(setRagStatus)
+                .catch((error: unknown) => {
+                    if (error instanceof ApiAuthError) {
+                        onAuthExpired();
+                        return;
+                    }
+
+                    setErrorMessage(error instanceof Error ? error.message : String(error));
+                });
+        }, 2500);
+
+        return () => window.clearInterval(timer);
+    }, [activeTab, ragStatus, onAuthExpired]);
 
     const filteredUsers = useMemo(() => {
         const query = userSearch.trim().toLowerCase();
@@ -429,7 +496,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             setRagStatus(nextStatus);
             setRagUploadFiles([]);
             setRagFileInputKey((prev) => prev + 1);
-            setStatusMessage('知识库文件已上传');
+            setStatusMessage('知识库文件已上传，正在后台生成');
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -445,7 +512,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         try {
             const nextStatus = await rebuildRagDatabase();
             setRagStatus(nextStatus);
-            setStatusMessage('RAG 向量数据库已生成');
+            setStatusMessage('RAG 向量数据库已开始后台重建');
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -453,7 +520,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         }
     };
 
-    const handleRagDelete = async (fileName: string) => {
+    const handleRagDelete = async (fileId: number, fileName: string) => {
         if (!window.confirm(`确定删除知识库文件「${fileName}」？`)) {
             return;
         }
@@ -463,7 +530,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         setStatusMessage(null);
 
         try {
-            const nextStatus = await deleteRagFile(fileName);
+            const nextStatus = await deleteRagFile(fileId);
             setRagStatus(nextStatus);
             setStatusMessage('知识库文件已删除');
         } catch (error: unknown) {
@@ -1201,14 +1268,19 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                             </td>
                                         </tr>
                                     ) : ragStatus.files.map((file) => (
-                                        <tr key={file.name}>
+                                        <tr key={file.id}>
                                             <td className="px-4 py-3">
                                                 <div className="max-w-[320px] truncate font-medium text-gray-950 dark:text-white">
                                                     {file.name}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    {file.md5 ? file.md5.slice(0, 12) : '-'}
+                                                    {file.sha256 ? file.sha256.slice(0, 12) : '-'}
                                                 </div>
+                                                {file.errorMessage && (
+                                                    <div className="mt-1 max-w-[320px] truncate text-xs text-red-600 dark:text-red-300">
+                                                        {file.errorMessage}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                                                 {formatFileSize(file.size)}
@@ -1220,18 +1292,15 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                 {formatDate(file.modifiedAt)}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={file.indexed
-                                                    ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
-                                                    : 'rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'}
-                                                >
-                                                    {file.indexed ? '已入库' : '待生成'}
+                                                <span className={ragFileStatusBadgeClass(file.status, file.indexed)}>
+                                                    {ragFileStatusLabel(file.status, file.indexed)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex justify-end">
                                                     <button
                                                         type="button"
-                                                        onClick={() => void handleRagDelete(file.name)}
+                                                        onClick={() => void handleRagDelete(file.id, file.name)}
                                                         disabled={saving}
                                                         className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-200 dark:hover:bg-red-500/15"
                                                         title="删除"
