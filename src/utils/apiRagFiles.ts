@@ -21,6 +21,11 @@ export type RagFileDetail = RagFileSummary & {
     snippet: string | null;
 };
 
+export type RagFilePreview = {
+    blob: Blob;
+    contentType: string;
+};
+
 type RagFileSummaryResponse = {
     id: number;
     name: string;
@@ -132,11 +137,15 @@ export const fetchRagFile = async (
     return normalizeDetail((await response.json()) as RagFileDetailResponse);
 };
 
-export const fetchRagFilePreview = async (fileId: number): Promise<Blob> => {
+export const fetchRagFilePreview = async (fileId: number): Promise<RagFilePreview> => {
     const response = await fetch(`${apiBaseUrl}/rag/files/${fileId}/preview`, {
         headers: authHeaders(),
     });
     await ensureOk(response);
 
-    return response.blob();
+    const blob = await response.blob();
+    return {
+        blob,
+        contentType: response.headers.get('content-type') ?? blob.type,
+    };
 };

@@ -126,12 +126,15 @@ export default function RagFileBrowser({
     const renderGenerationRef = useRef(0);
     const scrollFrameRef = useRef<number | null>(null);
     const scrollTargetNonceRef = useRef(0);
+    const imagePreviewUrlRef = useRef<string | null>(null);
     const [files, setFiles] = useState<RagFileSummary[]>([]);
     const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
     const [detail, setDetail] = useState<RagFileDetail | null>(null);
     const [loadingList, setLoadingList] = useState(false);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [loadingPreview, setLoadingPreview] = useState(false);
+    const [previewKind, setPreviewKind] = useState<'pdf' | 'image' | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [pageCount, setPageCount] = useState(0);
@@ -159,6 +162,16 @@ export default function RagFileBrowser({
         invalidateRenderTasks();
         renderedPagesRef.current = {};
         setRenderedPages({});
+    };
+
+    const revokeImagePreviewUrl = (clearState = true) => {
+        if (imagePreviewUrlRef.current) {
+            URL.revokeObjectURL(imagePreviewUrlRef.current);
+            imagePreviewUrlRef.current = null;
+        }
+        if (clearState) {
+            setImagePreviewUrl(null);
+        }
     };
 
     const setPageRenderInfo = (nextPageNumber: number, nextInfo: PageRenderInfo) => {
@@ -309,8 +322,10 @@ export default function RagFileBrowser({
         let loadingTask: PDFDocumentLoadingTask | null = null;
 
         resetPageRenderState();
+        revokeImagePreviewUrl();
 
         setPdfDocument(null);
+        setPreviewKind(null);
         setPageCount(0);
         setPageNumber(1);
         setVisiblePageRange(createPageRange(1, 1));
@@ -325,12 +340,24 @@ export default function RagFileBrowser({
         setLoadingPreview(true);
 
         fetchRagFilePreview(detailId)
-            .then((blob) => {
+            .then((preview) => {
                 if (cancelled) {
                     return null;
                 }
 
-                return blob.arrayBuffer();
+                const contentType = preview.contentType.toLowerCase();
+                if (contentType.startsWith('image/')) {
+                    const nextImagePreviewUrl = URL.createObjectURL(preview.blob);
+                    imagePreviewUrlRef.current = nextImagePreviewUrl;
+                    setPreviewKind('image');
+                    setImagePreviewUrl(nextImagePreviewUrl);
+                    setPageCount(1);
+                    queueScrollToPage(targetPageNumber ?? 1, 1);
+                    return null;
+                }
+
+                setPreviewKind('pdf');
+                return preview.blob.arrayBuffer();
             })
             .then((arrayBuffer) => {
                 if (cancelled || !arrayBuffer) {
@@ -351,6 +378,7 @@ export default function RagFileBrowser({
                 }
 
                 setPdfDocument(nextDocument);
+                setPreviewKind('pdf');
                 setPageCount(nextDocument.numPages);
                 queueScrollToPage(targetPageNumber ?? 1, nextDocument.numPages);
             })
@@ -375,6 +403,7 @@ export default function RagFileBrowser({
         return () => {
             cancelled = true;
             invalidateRenderTasks();
+            revokeImagePreviewUrl(false);
             if (loadingTask) {
                 void loadingTask.destroy();
             }
@@ -867,9 +896,76 @@ export default function RagFileBrowser({
                             <div className="m-5 rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
                                 {previewError}
                             </div>
-                        ) : !pdfDocument || pageCount <= 0 ? (
+                        ) : previewKind === 'image' && imagePreviewUrl ? (
+                            <div className="flex h-full min-h-0 flex-col">
+                                <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+                                    <div className="min-w-24 text-sm text-gray-700 dark:text-gray-200">
+                                        1 / 1
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={zoomOut}
+                                            disabled={zoom <= MIN_ZOOM}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
+                                            aria-label="缩小"
+                                            title="缩小"
+                                        >
+                                            -
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={resetZoom}
+                                            className="h-8 min-w-14 rounded-lg px-2 text-sm text-gray-700 hover:bg-black/5 dark:text-gray-200 dark:hover:bg-white/10"
+                                            title="重置缩放"
+                                        >
+                                            {Math.round(zoom * 100)}%
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={zoomIn}
+                                            disabled={zoom >= MAX_ZOOM}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
+                                            aria-label="放大"
+                                            title="放大"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                                <div
+                                    ref={scrollContainerRef}
+                                    onScroll={handlePreviewScroll}
+                                    className="relative min-h-0 flex-1 overflow-auto bg-gray-100 px-3 py-4 dark:bg-[#0b1120]"
+                                >
+                                    <div className="mx-auto flex w-fit min-w-full flex-col items-center gap-4">
+                                        <section
+                                            ref={(element) => setPageElement(1, element)}
+                                            className="flex w-fit flex-col items-center gap-2"
+                                            data-page-number={1}
+                                        >
+                                            <div className="font-semibold text-xs text-blue-600 dark:text-blue-300">
+                                                第 1 页
+                                            </div>
+                                            <img
+                                                src={imagePreviewUrl}
+                                                alt={`${detail?.name ?? '文件预览'} 第 1 页`}
+                                                className="block max-w-none rounded-sm bg-white shadow"
+                                                style={{
+                                                    width: Math.round(DEFAULT_PAGE_WIDTH * PDF_BASE_SCALE * zoom),
+                                                }}
+                                            />
+                                        </section>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : previewKind === 'pdf' && (!pdfDocument || pageCount <= 0) ? (
                             <div className="flex h-full items-center justify-center font-sans text-sm text-gray-500 dark:text-gray-300">
                                 PDF 预览尚未生成
+                            </div>
+                        ) : !pdfDocument || pageCount <= 0 ? (
+                            <div className="flex h-full items-center justify-center font-sans text-sm text-gray-500 dark:text-gray-300">
+                                预览尚未生成
                             </div>
                         ) : (
                             <div className="flex h-full min-h-0 flex-col">

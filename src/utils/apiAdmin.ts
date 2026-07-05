@@ -82,6 +82,7 @@ export type RagKnowledgeFile = {
     sha256: string;
     status: string;
     errorMessage: string | null;
+    ocrUsed: boolean;
     indexed: boolean;
     chunkCount: number;
 };
@@ -174,6 +175,7 @@ type RagKnowledgeFileResponse = {
     sha256: string;
     status: string;
     error_message: string | null;
+    ocr_used: boolean;
     indexed: boolean;
     chunk_count: number;
 };
@@ -354,6 +356,7 @@ const normalizeRagFile = (file: RagKnowledgeFileResponse): RagKnowledgeFile => {
         sha256: file.sha256,
         status: file.status,
         errorMessage: file.error_message,
+        ocrUsed: file.ocr_used,
         indexed: file.indexed,
         chunkCount: file.chunk_count,
     };

@@ -74,7 +74,7 @@ const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
     { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
 ];
 
-const activeRagFileStatuses = new Set(['pending', 'extracting', 'rendering', 'indexing']);
+const activeRagFileStatuses = new Set(['pending', 'extracting', 'ocr', 'rendering', 'indexing']);
 
 const isRagFileProcessing = (status: string): boolean => {
     return activeRagFileStatuses.has(status);
@@ -91,6 +91,10 @@ const ragFileStatusLabel = (status: string, indexed: boolean): string => {
 
     if (status === 'extracting') {
         return '提取中';
+    }
+
+    if (status === 'ocr') {
+        return 'OCR 识别中';
     }
 
     if (status === 'rendering') {
@@ -1306,6 +1310,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                         <div className="text-xs text-gray-500">
                                                             {file.sha256 ? file.sha256.slice(0, 12) : '-'}
                                                         </div>
+                                                        {file.ocrUsed && (
+                                                            <div className="mt-1">
+                                                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                                                    OCR
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         {file.errorMessage && (
                                                             <div className="mt-1 truncate text-xs text-red-600 dark:text-red-300">
                                                                 {file.errorMessage}
