@@ -64,6 +64,17 @@ export type WebSearchConfig = {
     updatedAt: string;
 };
 
+export type PaddleOcrConfig = {
+    id: number;
+    provider: 'baidu_aistudio';
+    providerLabel: string;
+    modelName: string;
+    hasApiKey: boolean;
+    apiKeyMask: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
 export type AdminDashboard = {
     totalUsers: number;
     activeUsers: number;
@@ -84,6 +95,7 @@ export type RagKnowledgeFile = {
     errorMessage: string | null;
     indexed: boolean;
     chunkCount: number;
+    usedOcr: boolean;
 };
 
 export type RagStatus = {
@@ -156,6 +168,17 @@ type WebSearchConfigResponse = {
     updated_at: string;
 };
 
+type PaddleOcrConfigResponse = {
+    id: number;
+    provider: 'baidu_aistudio';
+    provider_label: string;
+    model_name: string;
+    has_api_key: boolean;
+    api_key_mask: string;
+    created_at: string;
+    updated_at: string;
+};
+
 type AdminDashboardResponse = {
     total_users: number;
     active_users: number;
@@ -176,6 +199,7 @@ type RagKnowledgeFileResponse = {
     error_message: string | null;
     indexed: boolean;
     chunk_count: number;
+    used_ocr: boolean;
 };
 
 type RagStatusResponse = {
@@ -209,6 +233,10 @@ export type ModelConfigDraft = {
 export type WebSearchConfigDraft = {
     apiKey?: string | null;
     isEnabled: boolean;
+};
+
+export type PaddleOcrConfigDraft = {
+    apiKey?: string | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -333,6 +361,21 @@ const normalizeWebSearchConfig = (
     };
 };
 
+const normalizePaddleOcrConfig = (
+    config: PaddleOcrConfigResponse
+): PaddleOcrConfig => {
+    return {
+        id: config.id,
+        provider: config.provider,
+        providerLabel: config.provider_label,
+        modelName: config.model_name,
+        hasApiKey: config.has_api_key,
+        apiKeyMask: config.api_key_mask,
+        createdAt: config.created_at,
+        updatedAt: config.updated_at,
+    };
+};
+
 const normalizeDashboard = (dashboard: AdminDashboardResponse): AdminDashboard => {
     return {
         totalUsers: dashboard.total_users,
@@ -356,6 +399,7 @@ const normalizeRagFile = (file: RagKnowledgeFileResponse): RagKnowledgeFile => {
         errorMessage: file.error_message,
         indexed: file.indexed,
         chunkCount: file.chunk_count,
+        usedOcr: file.used_ocr,
     };
 };
 
@@ -561,6 +605,37 @@ export const fetchRagStatus = async (): Promise<RagStatus> => {
     await ensureOk(response);
 
     return normalizeRagStatus((await response.json()) as RagStatusResponse);
+};
+
+export const fetchPaddleOcrConfig = async (): Promise<PaddleOcrConfig> => {
+    const response = await fetch(`${apiBaseUrl}/admin/paddle-ocr-config`, {
+        headers: authHeaders(),
+    });
+    await ensureOk(response);
+
+    return normalizePaddleOcrConfig(
+        (await response.json()) as PaddleOcrConfigResponse
+    );
+};
+
+export const updatePaddleOcrConfig = async (
+    draft: PaddleOcrConfigDraft
+): Promise<PaddleOcrConfig> => {
+    const payload: Record<string, unknown> = {};
+    if (draft.apiKey !== undefined) {
+        payload.api_key = draft.apiKey;
+    }
+
+    const response = await fetch(`${apiBaseUrl}/admin/paddle-ocr-config`, {
+        method: 'PUT',
+        headers: jsonAuthHeaders(),
+        body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+
+    return normalizePaddleOcrConfig(
+        (await response.json()) as PaddleOcrConfigResponse
+    );
 };
 
 export const uploadRagFiles = async (files: File[]): Promise<RagStatus> => {
