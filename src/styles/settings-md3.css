@@ -28,6 +28,34 @@
     width: 100%;
 }
 
+.settings-md3 md-filled-button,
+.settings-md3 md-filled-tonal-button,
+.settings-md3 md-outlined-button {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-inline-size: 5.5rem;
+    white-space: nowrap;
+    --md-filled-button-with-leading-icon-leading-space: 20px;
+    --md-filled-button-with-leading-icon-trailing-space: 28px;
+    --md-filled-tonal-button-with-leading-icon-leading-space: 20px;
+    --md-filled-tonal-button-with-leading-icon-trailing-space: 28px;
+    --md-outlined-button-with-leading-icon-leading-space: 20px;
+    --md-outlined-button-with-leading-icon-trailing-space: 28px;
+}
+
+.settings-md3__slot-icon {
+    align-items: center;
+    display: inline-flex;
+    height: 18px;
+    justify-content: center;
+    width: 18px;
+}
+
+.settings-md3__slot-icon svg {
+    display: block;
+    flex-shrink: 0;
+}
+
 .settings-md3__background-option {
     border: 2px solid transparent;
     border-radius: 16px;

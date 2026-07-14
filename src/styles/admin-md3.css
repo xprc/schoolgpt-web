@@ -32,6 +32,34 @@
     width: 100%;
 }
 
+.admin-md3 md-filled-button,
+.admin-md3 md-filled-tonal-button,
+.admin-md3 md-outlined-button {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-inline-size: 7.5rem;
+    white-space: nowrap;
+    --md-filled-button-with-leading-icon-leading-space: 20px;
+    --md-filled-button-with-leading-icon-trailing-space: 28px;
+    --md-filled-tonal-button-with-leading-icon-leading-space: 20px;
+    --md-filled-tonal-button-with-leading-icon-trailing-space: 28px;
+    --md-outlined-button-with-leading-icon-leading-space: 20px;
+    --md-outlined-button-with-leading-icon-trailing-space: 28px;
+}
+
+.admin-md3__slot-icon {
+    align-items: center;
+    display: inline-flex;
+    height: 18px;
+    justify-content: center;
+    width: 18px;
+}
+
+.admin-md3__slot-icon svg {
+    display: block;
+    flex-shrink: 0;
+}
+
 .admin-md3__table {
     width: 100%;
     text-align: left;

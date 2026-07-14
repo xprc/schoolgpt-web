@@ -79,6 +79,18 @@ type MaterialTextFieldElement = HTMLElement & {
     value: string;
 };
 
+const selectedOptionProps = (selected: boolean): { selected?: boolean } => {
+    return selected ? { selected: true } : {};
+};
+
+const getMaterialSelected = (event: FormEvent<HTMLElement>): boolean => {
+    return (event.currentTarget as MaterialSwitchElement).selected;
+};
+
+const getMaterialValue = (event: FormEvent<HTMLElement>): string => {
+    return (event.currentTarget as MaterialSelectElement | MaterialTextFieldElement).value;
+};
+
 const emptyUserDraft: AdminUserDraft = {
     username: '',
     email: '',
@@ -738,35 +750,38 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             className="admin-md3__field"
                             label="用户名"
                             value={userDraft.username}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setUserDraft((prev) => ({
                                     ...prev,
-                                    username: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    username: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field"
                             label="显示名称"
                             value={userDraft.displayName}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setUserDraft((prev) => ({
                                     ...prev,
-                                    displayName: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    displayName: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field"
                             type="email"
                             label="邮箱"
                             value={userDraft.email}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setUserDraft((prev) => ({
                                     ...prev,
-                                    email: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    email: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field"
@@ -774,43 +789,47 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             label="密码"
                             supportingText={editingUserId === null ? '' : '留空则不修改'}
                             value={userDraft.password ?? ''}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setUserDraft((prev) => ({
                                     ...prev,
-                                    password: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    password: value,
+                                }));
+                            }}
                         />
                         <md-outlined-select
                             className="admin-md3__field"
                             label="用户类型"
                             value={userDraft.userType}
                             menuPositioning="fixed"
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event) as UserType;
                                 setUserDraft((prev) => ({
                                     ...prev,
-                                    userType: (event.currentTarget as MaterialSelectElement).value as UserType,
-                                }))
-                            }
+                                    userType: value,
+                                }));
+                            }}
                         >
                             {Object.entries(userTypeLabels).map(([value, label]) => (
                                 <md-select-option
                                     key={value}
                                     value={value}
-                                    headline={label}
-                                    selected={userDraft.userType === value}
-                                />
+                                    {...selectedOptionProps(userDraft.userType === value)}
+                                >
+                                    <div slot="headline">{label}</div>
+                                </md-select-option>
                             ))}
                         </md-outlined-select>
                         <label className="admin-md3__muted flex items-center gap-3 text-sm">
                             <md-switch
                                 selected={userDraft.isActive}
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                    const selected = getMaterialSelected(event);
                                     setUserDraft((prev) => ({
                                         ...prev,
-                                        isActive: (event.currentTarget as MaterialSwitchElement).selected,
-                                    }))
-                                }
+                                        isActive: selected,
+                                    }));
+                                }}
                             />
                             <span>启用账号</span>
                         </label>
@@ -821,7 +840,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         disabled={saving}
                         className="mt-5 w-full"
                     >
-                        {editingUserId === null ? <Add01Icon size={16} /> : <Tick02Icon size={16} />}
+                        <span slot="icon" className="admin-md3__slot-icon">
+                            {editingUserId === null ? <Add01Icon size={16} /> : <Tick02Icon size={16} />}
+                        </span>
                         {editingUserId === null ? '创建用户' : '保存用户'}
                     </md-filled-button>
                 </form>
@@ -836,11 +857,11 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             type="search"
                             label="搜索用户"
                             value={userSearch}
-                            onInput={(event) =>
-                                setUserSearch((event.currentTarget as MaterialTextFieldElement).value)
-                            }
+                            onInput={(event) => setUserSearch(getMaterialValue(event))}
                         >
-                            <Search01Icon slot="leading-icon" size={16} />
+                            <span slot="leading-icon" className="admin-md3__slot-icon">
+                                <Search01Icon size={16} />
+                            </span>
                         </md-outlined-text-field>
                     </div>
                     <div className="overflow-x-auto">
@@ -912,11 +933,11 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         type="search"
                         label="搜索标题或用户"
                         value={conversationSearch}
-                        onInput={(event) =>
-                            setConversationSearch((event.currentTarget as MaterialTextFieldElement).value)
-                        }
+                        onInput={(event) => setConversationSearch(getMaterialValue(event))}
                     >
-                        <Search01Icon slot="leading-icon" size={16} />
+                        <span slot="leading-icon" className="admin-md3__slot-icon">
+                            <Search01Icon size={16} />
+                        </span>
                     </md-outlined-text-field>
                 </div>
                 <div className="overflow-x-auto">
@@ -1019,16 +1040,17 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             value={modelDraft.provider}
                             menuPositioning="fixed"
                             onInput={(event) =>
-                                handleProviderChange((event.currentTarget as MaterialSelectElement).value as 'deepseek' | 'qwen')
+                                handleProviderChange(getMaterialValue(event) as 'deepseek' | 'qwen')
                             }
                         >
                             {providerOptions.map((option) => (
                                 <md-select-option
                                     key={option.provider}
                                     value={option.provider}
-                                    headline={option.label}
-                                    selected={modelDraft.provider === option.provider}
-                                />
+                                    {...selectedOptionProps(modelDraft.provider === option.provider)}
+                                >
+                                    <div slot="headline">{option.label}</div>
+                                </md-select-option>
                             ))}
                         </md-outlined-select>
                         <md-outlined-text-field
@@ -1038,34 +1060,37 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             supportingText={selectedProvider?.models.length
                                 ? `可用：${selectedProvider.models.slice(0, 3).join(', ')}`
                                 : ''}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setModelDraft((prev) => ({
                                     ...prev,
-                                    modelName: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    modelName: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field sm:col-span-2"
                             label="Base URL"
                             value={modelDraft.baseUrl}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setModelDraft((prev) => ({
                                     ...prev,
-                                    baseUrl: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    baseUrl: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field sm:col-span-2"
                             label="Chat API Path"
                             value={modelDraft.apiPath}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setModelDraft((prev) => ({
                                     ...prev,
-                                    apiPath: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    apiPath: value,
+                                }));
+                            }}
                         />
                         <md-outlined-text-field
                             className="admin-md3__field sm:col-span-2"
@@ -1075,12 +1100,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             supportingText={modelConfig?.hasApiKey
                                 ? `已保存 ${modelConfig.apiKeyMask}`
                                 : '请输入 API Key'}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setModelDraft((prev) => ({
                                     ...prev,
-                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    apiKey: value,
+                                }));
+                            }}
                         />
                     </div>
                     <md-filled-button
@@ -1088,7 +1114,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         disabled={saving}
                         className="mt-5"
                     >
-                        <Tick02Icon slot="icon" size={16} />
+                        <span slot="icon" className="admin-md3__slot-icon">
+                            <Tick02Icon size={16} />
+                        </span>
                         保存配置
                     </md-filled-button>
                 </form>
@@ -1152,22 +1180,24 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             supportingText={webSearchConfig?.hasApiKey
                                 ? `已保存 ${webSearchConfig.apiKeyMask}`
                                 : '请输入 Tavily API Key'}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setWebSearchDraft((prev) => ({
                                     ...prev,
-                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
-                                }))
-                            }
+                                    apiKey: value,
+                                }));
+                            }}
                         />
                         <label className="admin-md3__muted flex items-center gap-3 text-sm">
                             <md-switch
                                 selected={webSearchDraft.isEnabled}
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                    const selected = getMaterialSelected(event);
                                     setWebSearchDraft((prev) => ({
                                         ...prev,
-                                        isEnabled: (event.currentTarget as MaterialSwitchElement).selected,
-                                    }))
-                                }
+                                        isEnabled: selected,
+                                    }));
+                                }}
                             />
                             <span>启用联网搜索</span>
                         </label>
@@ -1177,7 +1207,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         disabled={saving}
                         className="mt-5"
                     >
-                        <Tick02Icon slot="icon" size={16} />
+                        <span slot="icon" className="admin-md3__slot-icon">
+                            <Tick02Icon size={16} />
+                        </span>
                         保存配置
                     </md-filled-button>
                 </form>
@@ -1248,11 +1280,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             supportingText={paddleOcrConfig?.hasApiKey
                                 ? `已保存 ${paddleOcrConfig.apiKeyMask}`
                                 : '请输入 AI Studio Access Token'}
-                            onInput={(event) =>
+                            onInput={(event) => {
+                                const value = getMaterialValue(event);
                                 setPaddleOcrDraft({
-                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
-                                })
-                            }
+                                    apiKey: value,
+                                });
+                            }}
                         />
                     </div>
                     <md-filled-button
@@ -1260,7 +1293,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         disabled={saving}
                         className="mt-5"
                     >
-                        <Tick02Icon slot="icon" size={16} />
+                        <span slot="icon" className="admin-md3__slot-icon">
+                            <Tick02Icon size={16} />
+                        </span>
                         保存配置
                     </md-filled-button>
                 </form>
@@ -1357,7 +1392,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     onClick={() => void handleRagUpload()}
                                     disabled={saving || ragUploadFiles.length === 0}
                                 >
-                                    <Add01Icon slot="icon" size={16} />
+                                    <span slot="icon" className="admin-md3__slot-icon">
+                                        <Add01Icon size={16} />
+                                    </span>
                                     上传
                                 </md-filled-button>
                             </div>
@@ -1500,7 +1537,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             disabled={saving}
                             className="mt-5 w-full"
                         >
-                            <Refresh01Icon slot="icon" size={16} className={saving ? 'animate-spin' : ''} />
+                            <span slot="icon" className="admin-md3__slot-icon">
+                                <Refresh01Icon size={16} className={saving ? 'animate-spin' : ''} />
+                            </span>
                             生成数据库
                         </md-filled-button>
                     </div>
@@ -1586,7 +1625,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             <md-primary-tab
                                 key={tab.key}
                             >
-                                <Icon slot="icon" size={16} />
+                                <span slot="icon" className="admin-md3__slot-icon">
+                                    <Icon size={16} />
+                                </span>
                                 {tab.label}
                             </md-primary-tab>
                         );

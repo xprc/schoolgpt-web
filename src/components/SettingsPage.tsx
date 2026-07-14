@@ -47,6 +47,10 @@ type MaterialTextFieldElement = HTMLElement & {
     value: string;
 };
 
+const getMaterialValue = (event: FormEvent<HTMLElement>): string => {
+    return (event.currentTarget as MaterialTextFieldElement).value;
+};
+
 const formatDate = (value: string): string => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -367,11 +371,11 @@ export default function SettingsPage({
                                 type="search"
                                 label="搜索记忆"
                                 value={memorySearch}
-                                onInput={(event) =>
-                                    setMemorySearch((event.currentTarget as MaterialTextFieldElement).value)
-                                }
+                                onInput={(event) => setMemorySearch(getMaterialValue(event))}
                             >
-                                <Search01Icon slot="leading-icon" size={16} />
+                                <span slot="leading-icon" className="settings-md3__slot-icon">
+                                    <Search01Icon size={16} />
+                                </span>
                             </md-outlined-text-field>
                         </div>
 
@@ -383,9 +387,7 @@ export default function SettingsPage({
                                 value={memoryDraft}
                                 maxLength={4000}
                                 rows={4}
-                                onInput={(event) =>
-                                    setMemoryDraft((event.currentTarget as MaterialTextFieldElement).value)
-                                }
+                                onInput={(event) => setMemoryDraft(getMaterialValue(event))}
                             />
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="settings-md3__muted text-sm">
@@ -397,7 +399,9 @@ export default function SettingsPage({
                                             type="button"
                                             onClick={resetMemoryForm}
                                         >
-                                            <Cancel01Icon slot="icon" size={16} />
+                                            <span slot="icon" className="settings-md3__slot-icon">
+                                                <Cancel01Icon size={16} />
+                                            </span>
                                             取消
                                         </md-outlined-button>
                                     )}
@@ -406,9 +410,13 @@ export default function SettingsPage({
                                         disabled={!memoryDraft.trim() || memorySaving}
                                     >
                                         {editingMemoryId ? (
-                                            <Tick02Icon slot="icon" size={16} />
+                                            <span slot="icon" className="settings-md3__slot-icon">
+                                                <Tick02Icon size={16} />
+                                            </span>
                                         ) : (
-                                            <Add01Icon slot="icon" size={16} />
+                                            <span slot="icon" className="settings-md3__slot-icon">
+                                                <Add01Icon size={16} />
+                                            </span>
                                         )}
                                         {memorySaving ? '保存中' : editingMemoryId ? '保存' : '添加'}
                                     </md-filled-button>
