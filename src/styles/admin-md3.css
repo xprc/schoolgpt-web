@@ -1,0 +1,124 @@
+.admin-md3 {
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+}
+
+.admin-md3__top-app-bar {
+    background: var(--md-sys-color-surface-container-low);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.admin-md3__tab-bar {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.admin-md3__pane {
+    background: var(--md-sys-color-surface-container-low);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+}
+
+.admin-md3__pane-high {
+    background: var(--md-sys-color-surface-container);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+}
+
+.admin-md3__muted {
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-md3__field {
+    width: 100%;
+}
+
+.admin-md3__table {
+    width: 100%;
+    text-align: left;
+    font-size: 0.875rem;
+}
+
+.admin-md3__table thead {
+    background: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.admin-md3__table th,
+.admin-md3__table td {
+    padding: 0.85rem 1rem;
+}
+
+.admin-md3__table tbody tr {
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.admin-md3__table tbody tr:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 5%, transparent);
+}
+
+.admin-md3__chip {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    gap: 0.25rem;
+    line-height: 1;
+    padding: 0.45rem 0.65rem;
+}
+
+.admin-md3__chip--success {
+    background: #d9f7e8;
+    color: #0d5f3b;
+}
+
+.admin-md3__chip--info {
+    background: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+}
+
+.admin-md3__chip--warning {
+    background: #ffefc1;
+    color: #6f4d00;
+}
+
+.admin-md3__chip--error {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+}
+
+.admin-md3__chip--neutral {
+    background: var(--md-sys-color-surface-container-highest);
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+.dark .admin-md3__chip--success {
+    background: #124c32;
+    color: #b9f3d5;
+}
+
+.dark .admin-md3__chip--warning {
+    background: #533f0a;
+    color: #ffe2a1;
+}
+
+.admin-md3__file-input {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 0.875rem;
+}
+
+.admin-md3__file-input::file-selector-button {
+    background: var(--md-sys-color-secondary-container);
+    border: 0;
+    border-radius: 999px;
+    color: var(--md-sys-color-on-secondary-container);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    margin-right: 0.75rem;
+    padding: 0.65rem 1rem;
+}

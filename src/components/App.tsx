@@ -57,7 +57,7 @@ import type {
     ConversationSummary,
     Message,
     RagSource,
-} from '../utils/types';
+} from '../types';
 import type { RagFileOpenRequest } from './RagFileBrowser';
 
 const FirstRunSetupPage = lazy(() => import('./FirstRunSetupPage'));

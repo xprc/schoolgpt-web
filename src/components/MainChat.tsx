@@ -26,7 +26,7 @@ import {
 } from '../utils/chatHelpers';
 import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 import { parseSearchSourcesFromMarkdown } from '../utils/searchSources';
-import type { Message, RagSource } from '../utils/types';
+import type { Message, RagSource } from '../types';
 import SearchSourceList from './SearchSourceList';
 
 type MainChatProps = {

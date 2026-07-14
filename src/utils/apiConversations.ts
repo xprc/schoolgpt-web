@@ -7,7 +7,7 @@ import type {
     ConversationSummary,
     Message,
     RagSource,
-} from './types';
+} from '../types';
 
 type ConversationMessageResponse = {
     id: string;

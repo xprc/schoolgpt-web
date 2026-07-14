@@ -1,7 +1,7 @@
 import { apiBaseUrl } from './apiConfig';
 import { ApiAuthError } from './apiChat';
 import { getAccessToken } from './auth';
-import type { UserMemory } from './types';
+import type { UserMemory } from '../types';
 
 type UserMemoryResponse = {
     id: string;

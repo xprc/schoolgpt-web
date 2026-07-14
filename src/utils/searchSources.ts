@@ -1,4 +1,4 @@
-import type { SearchSource } from './types';
+import type { SearchSource } from '../types';
 
 export type ParsedSearchSources = {
     content: string;

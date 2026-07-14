@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import CodeBlock from './CodeBlock';
-import type { SearchSource } from '../utils/types';
+import type { SearchSource } from '../types';
 
 type MarkdownContentProps = {
     content: string;

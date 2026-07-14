@@ -1,4 +1,4 @@
-import type { SearchSource } from '../utils/types';
+import type { SearchSource } from '../types';
 
 type SearchSourceListProps = {
     sources: SearchSource[];

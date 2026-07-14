@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import '@material/web/button/filled-button.js';
+import '@material/web/iconbutton/icon-button.js';
+import '@material/web/progress/circular-progress.js';
+import '@material/web/select/outlined-select.js';
+import '@material/web/select/select-option.js';
+import '@material/web/switch/switch.js';
+import '@material/web/tabs/primary-tab.js';
+import '@material/web/tabs/tabs.js';
+import '@material/web/textfield/outlined-text-field.js';
 import {
     Add01Icon,
     BotIcon,
@@ -44,12 +53,30 @@ import {
     type WebSearchConfig,
 } from '../utils/apiAdmin';
 import { renderFileTypeIcon } from '../utils/fileTypeIcons';
+import '../styles/md3-theme.css';
+import '../styles/admin-md3.css';
 
 type AdminTab = 'dashboard' | 'users' | 'conversations' | 'model' | 'web-search' | 'ocr' | 'rag';
 
 type AdminCenterProps = {
     onClose: () => void;
     onAuthExpired: () => void;
+};
+
+type MaterialSelectElement = HTMLElement & {
+    value: string;
+};
+
+type MaterialSwitchElement = HTMLElement & {
+    selected: boolean;
+};
+
+type MaterialTabsElement = HTMLElement & {
+    activeTabIndex: number;
+};
+
+type MaterialTextFieldElement = HTMLElement & {
+    value: string;
 };
 
 const emptyUserDraft: AdminUserDraft = {
@@ -114,18 +141,18 @@ const ragFileStatusLabel = (status: string, indexed: boolean): string => {
 
 const ragFileStatusBadgeClass = (status: string, indexed: boolean): string => {
     if (status === 'failed') {
-        return 'rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200';
+        return 'admin-md3__chip admin-md3__chip--error';
     }
 
     if (indexed) {
-        return 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200';
+        return 'admin-md3__chip admin-md3__chip--success';
     }
 
     if (isRagFileProcessing(status)) {
-        return 'rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-200';
+        return 'admin-md3__chip admin-md3__chip--info';
     }
 
-    return 'rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
+    return 'admin-md3__chip admin-md3__chip--warning';
 };
 
 const formatDate = (value: string | null): string => {
@@ -346,6 +373,15 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     const selectedProvider = providerOptions.find(
         (option) => option.provider === modelDraft.provider
     );
+    const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.key === activeTab));
+
+    const handleTabsChange = (event: FormEvent<HTMLElement>) => {
+        const nextIndex = (event.currentTarget as MaterialTabsElement).activeTabIndex;
+        const nextTab = tabs[nextIndex];
+        if (nextTab) {
+            setActiveTab(nextTab.key);
+        }
+    };
 
     const resetUserForm = () => {
         setEditingUserId(null);
@@ -603,12 +639,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     {stats.map((stat) => (
                         <div
                             key={stat.label}
-                            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                            className="admin-md3__pane p-5"
                         >
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="admin-md3__muted text-sm">
                                 {stat.label}
                             </div>
-                            <div className="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">
+                            <div className="mt-2 text-3xl font-semibold">
                                 {formatCount(stat.value)}
                             </div>
                         </div>
@@ -616,20 +652,20 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-2">
-                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <div className="admin-md3__pane p-5">
+                        <h3 className="text-base font-semibold">
                             用户类型
                         </h3>
                         <div className="mt-4 space-y-3">
                             {Object.entries(userTypeLabels).map(([userType, label]) => (
                                 <div key={userType}>
-                                    <div className="mb-1 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+                                    <div className="admin-md3__muted mb-1 flex items-center justify-between text-sm">
                                         <span>{label}</span>
                                         <span>{dashboard.usersByType[userType] ?? 0}</span>
                                     </div>
-                                    <div className="h-2 rounded-full bg-gray-100 dark:bg-white/10">
+                                    <div className="h-2 rounded-full bg-[var(--md-sys-color-surface-container-highest)]">
                                         <div
-                                            className="h-2 rounded-full bg-[#5b6ef5]"
+                                            className="h-2 rounded-full bg-[var(--md-sys-color-primary)]"
                                             style={{
                                                 width: `${dashboard.totalUsers > 0
                                                     ? ((dashboard.usersByType[userType] ?? 0) / dashboard.totalUsers) * 100
@@ -642,28 +678,28 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <div className="admin-md3__pane p-5">
+                        <h3 className="text-base font-semibold">
                             当前模型
                         </h3>
                         <dl className="mt-4 grid gap-3 text-sm">
                             <div className="flex items-center justify-between gap-4">
-                                <dt className="text-gray-500 dark:text-gray-400">供应商</dt>
-                                <dd className="font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">供应商</dt>
+                                <dd className="font-medium">
                                     {dashboard.activeModel.providerLabel}
                                 </dd>
                             </div>
                             <div className="flex items-center justify-between gap-4">
-                                <dt className="text-gray-500 dark:text-gray-400">模型</dt>
-                                <dd className="font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">模型</dt>
+                                <dd className="font-medium">
                                     {dashboard.activeModel.modelName}
                                 </dd>
                             </div>
                             <div className="flex items-center justify-between gap-4">
-                                <dt className="text-gray-500 dark:text-gray-400">API Key</dt>
+                                <dt className="admin-md3__muted">API Key</dt>
                                 <dd className={dashboard.activeModel.hasApiKey
                                     ? 'font-medium text-emerald-600 dark:text-emerald-300'
-                                    : 'font-medium text-red-600 dark:text-red-300'}
+                                    : 'font-medium text-[var(--md-sys-color-error)]'}
                                 >
                                     {dashboard.activeModel.hasApiKey ? '已配置' : '未配置'}
                                 </dd>
@@ -680,196 +716,178 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="grid min-h-0 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
                 <form
                     onSubmit={handleUserSubmit}
-                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                    className="admin-md3__pane p-5"
                 >
                     <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                        <h3 className="text-base font-semibold">
                             {editingUserId === null ? '新增用户' : '编辑用户'}
                         </h3>
                         {editingUserId !== null && (
-                            <button
+                            <md-icon-button
                                 type="button"
                                 onClick={resetUserForm}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10"
                                 title="取消编辑"
                             >
                                 <Cancel01Icon size={16} />
-                            </button>
+                            </md-icon-button>
                         )}
                     </div>
 
                     <div className="space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                用户名
-                            </span>
-                            <input
-                                value={userDraft.username}
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            label="用户名"
+                            value={userDraft.username}
+                            onInput={(event) =>
+                                setUserDraft((prev) => ({
+                                    ...prev,
+                                    username: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            label="显示名称"
+                            value={userDraft.displayName}
+                            onInput={(event) =>
+                                setUserDraft((prev) => ({
+                                    ...prev,
+                                    displayName: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            type="email"
+                            label="邮箱"
+                            value={userDraft.email}
+                            onInput={(event) =>
+                                setUserDraft((prev) => ({
+                                    ...prev,
+                                    email: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            type="password"
+                            label="密码"
+                            supportingText={editingUserId === null ? '' : '留空则不修改'}
+                            value={userDraft.password ?? ''}
+                            onInput={(event) =>
+                                setUserDraft((prev) => ({
+                                    ...prev,
+                                    password: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-select
+                            className="admin-md3__field"
+                            label="用户类型"
+                            value={userDraft.userType}
+                            menuPositioning="fixed"
+                            onInput={(event) =>
+                                setUserDraft((prev) => ({
+                                    ...prev,
+                                    userType: (event.currentTarget as MaterialSelectElement).value as UserType,
+                                }))
+                            }
+                        >
+                            {Object.entries(userTypeLabels).map(([value, label]) => (
+                                <md-select-option
+                                    key={value}
+                                    value={value}
+                                    headline={label}
+                                    selected={userDraft.userType === value}
+                                />
+                            ))}
+                        </md-outlined-select>
+                        <label className="admin-md3__muted flex items-center gap-3 text-sm">
+                            <md-switch
+                                selected={userDraft.isActive}
                                 onChange={(event) =>
                                     setUserDraft((prev) => ({
                                         ...prev,
-                                        username: event.target.value,
+                                        isActive: (event.currentTarget as MaterialSwitchElement).selected,
                                     }))
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
                             />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                显示名称
-                            </span>
-                            <input
-                                value={userDraft.displayName}
-                                onChange={(event) =>
-                                    setUserDraft((prev) => ({
-                                        ...prev,
-                                        displayName: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                邮箱
-                            </span>
-                            <input
-                                type="email"
-                                value={userDraft.email}
-                                onChange={(event) =>
-                                    setUserDraft((prev) => ({
-                                        ...prev,
-                                        email: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                密码
-                            </span>
-                            <input
-                                type="password"
-                                value={userDraft.password ?? ''}
-                                placeholder={editingUserId === null ? '' : '留空则不修改'}
-                                onChange={(event) =>
-                                    setUserDraft((prev) => ({
-                                        ...prev,
-                                        password: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                用户类型
-                            </span>
-                            <select
-                                value={userDraft.userType}
-                                onChange={(event) =>
-                                    setUserDraft((prev) => ({
-                                        ...prev,
-                                        userType: event.target.value as UserType,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            >
-                                {Object.entries(userTypeLabels).map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input
-                                type="checkbox"
-                                checked={userDraft.isActive}
-                                onChange={(event) =>
-                                    setUserDraft((prev) => ({
-                                        ...prev,
-                                        isActive: event.target.checked,
-                                    }))
-                                }
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            启用账号
+                            <span>启用账号</span>
                         </label>
                     </div>
 
-                    <button
+                    <md-filled-button
                         type="submit"
                         disabled={saving}
-                        className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        className="mt-5 w-full"
                     >
                         {editingUserId === null ? <Add01Icon size={16} /> : <Tick02Icon size={16} />}
                         {editingUserId === null ? '创建用户' : '保存用户'}
-                    </button>
+                    </md-filled-button>
                 </form>
 
-                <div className="min-w-0 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                    <div className="flex flex-col gap-3 border-b border-gray-200 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                <div className="admin-md3__pane min-w-0 overflow-hidden">
+                    <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <h3 className="text-base font-semibold">
                             用户列表
                         </h3>
-                        <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
-                            <Search01Icon size={16} className="text-gray-400" />
-                            <input
-                                value={userSearch}
-                                onChange={(event) => setUserSearch(event.target.value)}
-                                placeholder="搜索用户"
-                                className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
-                            />
-                        </div>
+                        <md-outlined-text-field
+                            className="admin-md3__field sm:max-w-xs"
+                            type="search"
+                            label="搜索用户"
+                            value={userSearch}
+                            onInput={(event) =>
+                                setUserSearch((event.currentTarget as MaterialTextFieldElement).value)
+                            }
+                        >
+                            <Search01Icon slot="leading-icon" size={16} />
+                        </md-outlined-text-field>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[760px] text-left text-sm">
-                            <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                        <table className="admin-md3__table min-w-[760px]">
+                            <thead>
                                 <tr>
-                                    <th className="px-4 py-3">用户</th>
-                                    <th className="px-4 py-3">类型</th>
-                                    <th className="px-4 py-3">状态</th>
-                                    <th className="px-4 py-3">最后登录</th>
-                                    <th className="px-4 py-3 text-right">操作</th>
+                                    <th>用户</th>
+                                    <th>类型</th>
+                                    <th>状态</th>
+                                    <th>最后登录</th>
+                                    <th className="text-right">操作</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                            <tbody>
                                 {filteredUsers.map((user) => (
                                     <tr key={user.id}>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-gray-950 dark:text-white">
+                                        <td>
+                                            <div className="font-medium">
                                                 {user.displayName}
                                             </div>
-                                            <div className="text-xs text-gray-500">
+                                            <div className="admin-md3__muted text-xs">
                                                 {user.username} · {user.email}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                        <td>
                                             {userTypeLabels[user.userType]}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td>
                                             <span className={user.isActive
-                                                ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
-                                                : 'rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300'}
+                                                ? 'admin-md3__chip admin-md3__chip--success'
+                                                : 'admin-md3__chip admin-md3__chip--neutral'}
                                             >
                                                 {user.isActive ? '启用' : '停用'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        <td className="admin-md3__muted">
                                             {formatDate(user.lastLoginAt)}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td>
                                             <div className="flex justify-end">
-                                                <button
+                                                <md-icon-button
                                                     type="button"
                                                     onClick={() => handleEditUser(user)}
-                                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
                                                     title="编辑"
                                                 >
                                                     <Edit01Icon size={16} />
-                                                </button>
+                                                </md-icon-button>
                                             </div>
                                         </td>
                                     </tr>
@@ -884,73 +902,75 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
 
     const renderConversations = () => {
         return (
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                <div className="flex flex-col gap-3 border-b border-gray-200 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+            <div className="admin-md3__pane overflow-hidden">
+                <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="text-base font-semibold">
                         对话列表
                     </h3>
-                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
-                        <Search01Icon size={16} className="text-gray-400" />
-                        <input
-                            value={conversationSearch}
-                            onChange={(event) => setConversationSearch(event.target.value)}
-                            placeholder="搜索标题或用户"
-                            className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
-                        />
-                    </div>
+                    <md-outlined-text-field
+                        className="admin-md3__field sm:max-w-xs"
+                        type="search"
+                        label="搜索标题或用户"
+                        value={conversationSearch}
+                        onInput={(event) =>
+                            setConversationSearch((event.currentTarget as MaterialTextFieldElement).value)
+                        }
+                    >
+                        <Search01Icon slot="leading-icon" size={16} />
+                    </md-outlined-text-field>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] text-left text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                    <table className="admin-md3__table min-w-[920px]">
+                        <thead>
                             <tr>
-                                <th className="px-4 py-3">对话</th>
-                                <th className="px-4 py-3">所有者</th>
-                                <th className="px-4 py-3">共享</th>
-                                <th className="px-4 py-3">消息数</th>
-                                <th className="px-4 py-3">更新时间</th>
-                                <th className="px-4 py-3">状态</th>
-                                <th className="px-4 py-3 text-right">操作</th>
+                                <th>对话</th>
+                                <th>所有者</th>
+                                <th>共享</th>
+                                <th>消息数</th>
+                                <th>更新时间</th>
+                                <th>状态</th>
+                                <th className="text-right">操作</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        <tbody>
                             {filteredConversations.map((conversation) => (
                                 <tr key={conversation.id}>
-                                    <td className="px-4 py-3">
-                                        <div className="max-w-[280px] truncate font-medium text-gray-950 dark:text-white">
+                                    <td>
+                                        <div className="max-w-[280px] truncate font-medium">
                                             {conversation.title}
                                         </div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="admin-md3__muted text-xs">
                                             {conversation.id}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-gray-800 dark:text-gray-200">
+                                    <td>
+                                        <div>
                                             {conversation.ownerUsername}
                                         </div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="admin-md3__muted text-xs">
                                             {conversation.ownerEmail}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                    <td className="admin-md3__muted">
                                         {conversation.shareScope}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                    <td className="admin-md3__muted">
                                         {conversation.messageCount}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                    <td className="admin-md3__muted">
                                         {formatDate(conversation.updatedAt)}
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td>
                                         <span className={conversation.isVisible
-                                            ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
-                                            : 'rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-300'}
+                                            ? 'admin-md3__chip admin-md3__chip--success'
+                                            : 'admin-md3__chip admin-md3__chip--neutral'}
                                         >
                                             {conversation.isVisible ? '可见' : '已隐藏'}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td>
                                         <div className="flex justify-end gap-1">
-                                            <button
+                                            <md-icon-button
                                                 type="button"
                                                 onClick={() =>
                                                     handleConversationVisibility(
@@ -958,21 +978,19 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                         !conversation.isVisible
                                                     )
                                                 }
-                                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
                                                 title={conversation.isVisible ? '隐藏' : '恢复'}
                                             >
                                                 {conversation.isVisible
                                                     ? <Cancel01Icon size={16} />
                                                     : <Tick02Icon size={16} />}
-                                            </button>
-                                            <button
+                                            </md-icon-button>
+                                            <md-icon-button
                                                 type="button"
                                                 onClick={() => handleDeleteConversation(conversation)}
-                                                className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-200 dark:hover:bg-red-500/15"
                                                 title="删除"
                                             >
                                                 <Delete02Icon size={16} />
-                                            </button>
+                                            </md-icon-button>
                                         </div>
                                     </td>
                                 </tr>
@@ -989,141 +1007,122 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <form
                     onSubmit={handleModelSubmit}
-                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                    className="admin-md3__pane p-5"
                 >
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <h3 className="text-base font-semibold">
                         模型配置
                     </h3>
                     <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                模型供应商
-                            </span>
-                            <select
-                                value={modelDraft.provider}
-                                onChange={(event) =>
-                                    handleProviderChange(event.target.value as 'deepseek' | 'qwen')
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            >
-                                {providerOptions.map((option) => (
-                                    <option key={option.provider} value={option.provider}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                模型名称
-                            </span>
-                            <input
-                                list="admin-model-options"
-                                value={modelDraft.modelName}
-                                onChange={(event) =>
-                                    setModelDraft((prev) => ({
-                                        ...prev,
-                                        modelName: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                            <datalist id="admin-model-options">
-                                {selectedProvider?.models.map((model) => (
-                                    <option key={model} value={model} />
-                                ))}
-                            </datalist>
-                        </label>
-                        <label className="block sm:col-span-2">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                Base URL
-                            </span>
-                            <input
-                                value={modelDraft.baseUrl}
-                                onChange={(event) =>
-                                    setModelDraft((prev) => ({
-                                        ...prev,
-                                        baseUrl: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
-                        <label className="block sm:col-span-2">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                Chat API Path
-                            </span>
-                            <input
-                                value={modelDraft.apiPath}
-                                onChange={(event) =>
-                                    setModelDraft((prev) => ({
-                                        ...prev,
-                                        apiPath: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
-                        <label className="block sm:col-span-2">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                API Key
-                            </span>
-                            <input
-                                type="password"
-                                value={modelDraft.apiKey}
-                                placeholder={modelConfig?.hasApiKey
-                                    ? `已保存 ${modelConfig.apiKeyMask}`
-                                    : '请输入 API Key'}
-                                onChange={(event) =>
-                                    setModelDraft((prev) => ({
-                                        ...prev,
-                                        apiKey: event.target.value,
-                                    }))
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
+                        <md-outlined-select
+                            className="admin-md3__field"
+                            label="模型供应商"
+                            value={modelDraft.provider}
+                            menuPositioning="fixed"
+                            onInput={(event) =>
+                                handleProviderChange((event.currentTarget as MaterialSelectElement).value as 'deepseek' | 'qwen')
+                            }
+                        >
+                            {providerOptions.map((option) => (
+                                <md-select-option
+                                    key={option.provider}
+                                    value={option.provider}
+                                    headline={option.label}
+                                    selected={modelDraft.provider === option.provider}
+                                />
+                            ))}
+                        </md-outlined-select>
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            label="模型名称"
+                            value={modelDraft.modelName}
+                            supportingText={selectedProvider?.models.length
+                                ? `可用：${selectedProvider.models.slice(0, 3).join(', ')}`
+                                : ''}
+                            onInput={(event) =>
+                                setModelDraft((prev) => ({
+                                    ...prev,
+                                    modelName: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field sm:col-span-2"
+                            label="Base URL"
+                            value={modelDraft.baseUrl}
+                            onInput={(event) =>
+                                setModelDraft((prev) => ({
+                                    ...prev,
+                                    baseUrl: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field sm:col-span-2"
+                            label="Chat API Path"
+                            value={modelDraft.apiPath}
+                            onInput={(event) =>
+                                setModelDraft((prev) => ({
+                                    ...prev,
+                                    apiPath: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <md-outlined-text-field
+                            className="admin-md3__field sm:col-span-2"
+                            type="password"
+                            label="API Key"
+                            value={modelDraft.apiKey}
+                            supportingText={modelConfig?.hasApiKey
+                                ? `已保存 ${modelConfig.apiKeyMask}`
+                                : '请输入 API Key'}
+                            onInput={(event) =>
+                                setModelDraft((prev) => ({
+                                    ...prev,
+                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
                     </div>
-                    <button
+                    <md-filled-button
                         type="submit"
                         disabled={saving}
-                        className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        className="mt-5"
                     >
-                        <Tick02Icon size={16} />
+                        <Tick02Icon slot="icon" size={16} />
                         保存配置
-                    </button>
+                    </md-filled-button>
                 </form>
 
-                <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                <div className="admin-md3__pane p-5">
+                    <h3 className="text-base font-semibold">
                         当前生效
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">供应商</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">供应商</dt>
+                            <dd className="mt-1 font-medium">
                                 {modelConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">模型</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">模型</dt>
+                            <dd className="mt-1 font-medium">
                                 {modelConfig?.modelName ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">接口</dt>
-                            <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">接口</dt>
+                            <dd className="mt-1 break-all font-medium">
                                 {modelConfig
                                     ? `${modelConfig.baseUrl}${modelConfig.apiPath}`
                                     : '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">API Key</dt>
+                            <dt className="admin-md3__muted">API Key</dt>
                             <dd className={modelConfig?.hasApiKey
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
-                                : 'mt-1 font-medium text-red-600 dark:text-red-300'}
+                                : 'mt-1 font-medium text-[var(--md-sys-color-error)]'}
                             >
                                 {modelConfig?.hasApiKey ? modelConfig.apiKeyMask : '未配置'}
                             </dd>
@@ -1139,81 +1138,75 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <form
                     onSubmit={handleWebSearchSubmit}
-                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                    className="admin-md3__pane p-5"
                 >
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <h3 className="text-base font-semibold">
                         联网搜索
                     </h3>
                     <div className="mt-5 space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                Tavily API Key
-                            </span>
-                            <input
-                                type="password"
-                                value={webSearchDraft.apiKey}
-                                placeholder={webSearchConfig?.hasApiKey
-                                    ? `已保存 ${webSearchConfig.apiKeyMask}`
-                                    : '请输入 Tavily API Key'}
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            type="password"
+                            label="Tavily API Key"
+                            value={webSearchDraft.apiKey}
+                            supportingText={webSearchConfig?.hasApiKey
+                                ? `已保存 ${webSearchConfig.apiKeyMask}`
+                                : '请输入 Tavily API Key'}
+                            onInput={(event) =>
+                                setWebSearchDraft((prev) => ({
+                                    ...prev,
+                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
+                                }))
+                            }
+                        />
+                        <label className="admin-md3__muted flex items-center gap-3 text-sm">
+                            <md-switch
+                                selected={webSearchDraft.isEnabled}
                                 onChange={(event) =>
                                     setWebSearchDraft((prev) => ({
                                         ...prev,
-                                        apiKey: event.target.value,
+                                        isEnabled: (event.currentTarget as MaterialSwitchElement).selected,
                                     }))
                                 }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
                             />
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input
-                                type="checkbox"
-                                checked={webSearchDraft.isEnabled}
-                                onChange={(event) =>
-                                    setWebSearchDraft((prev) => ({
-                                        ...prev,
-                                        isEnabled: event.target.checked,
-                                    }))
-                                }
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            启用联网搜索
+                            <span>启用联网搜索</span>
                         </label>
                     </div>
-                    <button
+                    <md-filled-button
                         type="submit"
                         disabled={saving}
-                        className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        className="mt-5"
                     >
-                        <Tick02Icon size={16} />
+                        <Tick02Icon slot="icon" size={16} />
                         保存配置
-                    </button>
+                    </md-filled-button>
                 </form>
 
-                <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                <div className="admin-md3__pane p-5">
+                    <h3 className="text-base font-semibold">
                         当前生效
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">供应商</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">供应商</dt>
+                            <dd className="mt-1 font-medium">
                                 {webSearchConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">状态</dt>
+                            <dt className="admin-md3__muted">状态</dt>
                             <dd className={webSearchConfig?.isEnabled
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
-                                : 'mt-1 font-medium text-gray-500 dark:text-gray-300'}
+                                : 'admin-md3__muted mt-1 font-medium'}
                             >
                                 {webSearchConfig?.isEnabled ? '启用' : '停用'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">API Key</dt>
+                            <dt className="admin-md3__muted">API Key</dt>
                             <dd className={webSearchConfig?.hasApiKey
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
-                                : 'mt-1 font-medium text-red-600 dark:text-red-300'}
+                                : 'mt-1 font-medium text-[var(--md-sys-color-error)]'}
                             >
                                 {webSearchConfig?.hasApiKey
                                     ? webSearchConfig.apiKeyMask
@@ -1221,8 +1214,8 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">更新时间</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">更新时间</dt>
+                            <dd className="mt-1 font-medium">
                                 {formatDate(webSearchConfig?.updatedAt ?? null)}
                             </dd>
                         </div>
@@ -1237,65 +1230,63 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <form
                     onSubmit={handlePaddleOcrSubmit}
-                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                    className="admin-md3__pane p-5"
                 >
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <h3 className="text-base font-semibold">
                         百度 PaddleOCR
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                    <p className="admin-md3__muted mt-2 text-sm leading-6">
                         用于 PNG、JPG、JPEG 和图片型 PDF 的异步识别。这里填写的是百度 AI Studio
                         访问令牌（Access Token），界面按 API Key 管理。
                     </p>
                     <div className="mt-5 space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                百度 API Key / Access Token
-                            </span>
-                            <input
-                                type="password"
-                                value={paddleOcrDraft.apiKey}
-                                placeholder={paddleOcrConfig?.hasApiKey
-                                    ? `已保存 ${paddleOcrConfig.apiKeyMask}`
-                                    : '请输入 AI Studio Access Token'}
-                                onChange={(event) =>
-                                    setPaddleOcrDraft({ apiKey: event.target.value })
-                                }
-                                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#5b6ef5] dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-                        </label>
+                        <md-outlined-text-field
+                            className="admin-md3__field"
+                            type="password"
+                            label="百度 API Key / Access Token"
+                            value={paddleOcrDraft.apiKey}
+                            supportingText={paddleOcrConfig?.hasApiKey
+                                ? `已保存 ${paddleOcrConfig.apiKeyMask}`
+                                : '请输入 AI Studio Access Token'}
+                            onInput={(event) =>
+                                setPaddleOcrDraft({
+                                    apiKey: (event.currentTarget as MaterialTextFieldElement).value,
+                                })
+                            }
+                        />
                     </div>
-                    <button
+                    <md-filled-button
                         type="submit"
                         disabled={saving}
-                        className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        className="mt-5"
                     >
-                        <Tick02Icon size={16} />
+                        <Tick02Icon slot="icon" size={16} />
                         保存配置
-                    </button>
+                    </md-filled-button>
                 </form>
 
-                <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                    <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                <div className="admin-md3__pane p-5">
+                    <h3 className="text-base font-semibold">
                         当前生效
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">供应商</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">供应商</dt>
+                            <dd className="mt-1 font-medium">
                                 {paddleOcrConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">模型</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">模型</dt>
+                            <dd className="mt-1 font-medium">
                                 {paddleOcrConfig?.modelName ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">API Key</dt>
+                            <dt className="admin-md3__muted">API Key</dt>
                             <dd className={paddleOcrConfig?.hasApiKey
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
-                                : 'mt-1 font-medium text-red-600 dark:text-red-300'}
+                                : 'mt-1 font-medium text-[var(--md-sys-color-error)]'}
                             >
                                 {paddleOcrConfig?.hasApiKey
                                     ? paddleOcrConfig.apiKeyMask
@@ -1303,8 +1294,8 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-500 dark:text-gray-400">更新时间</dt>
-                            <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                            <dt className="admin-md3__muted">更新时间</dt>
+                            <dd className="mt-1 font-medium">
                                 {formatDate(paddleOcrConfig?.updatedAt ?? null)}
                             </dd>
                         </div>
@@ -1334,12 +1325,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     {ragStats.map((stat) => (
                         <div
                             key={stat.label}
-                            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]"
+                            className="admin-md3__pane p-5"
                         >
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="admin-md3__muted text-sm">
                                 {stat.label}
                             </div>
-                            <div className="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">
+                            <div className="mt-2 text-3xl font-semibold">
                                 {formatCount(stat.value)}
                             </div>
                         </div>
@@ -1347,9 +1338,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 </div>
 
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                    <div className="min-w-0 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                        <div className="flex flex-col gap-3 border-b border-gray-200 p-4 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
-                            <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <div className="admin-md3__pane min-w-0 overflow-hidden">
+                        <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 lg:flex-row lg:items-center lg:justify-between">
+                            <h3 className="text-base font-semibold">
                                 知识文件
                             </h3>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1359,24 +1350,23 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     multiple
                                     accept={uploadAccept}
                                     onChange={handleRagFileChange}
-                                    className="max-w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-[#eef2ff] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#4a5ce0] hover:file:bg-[#e0e7ff] dark:text-gray-300 dark:file:bg-white/10 dark:file:text-white"
+                                    className="admin-md3__file-input max-w-full"
                                 />
-                                <button
+                                <md-filled-button
                                     type="button"
                                     onClick={() => void handleRagUpload()}
                                     disabled={saving || ragUploadFiles.length === 0}
-                                    className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
                                 >
-                                    <Add01Icon size={16} />
+                                    <Add01Icon slot="icon" size={16} />
                                     上传
-                                </button>
+                                </md-filled-button>
                             </div>
                             {ragUploadFiles.length > 0 && (
                                 <div className="flex flex-wrap gap-2">
                                     {ragUploadFiles.map((file, index) => (
                                         <span
                                             key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                                            className="flex max-w-full items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300"
+                                            className="admin-md3__chip admin-md3__chip--neutral max-w-full"
                                         >
                                             {renderFileTypeIcon(file.name, {
                                                 size: 14,
@@ -1393,79 +1383,78 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             )}
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[780px] text-left text-sm">
-                                <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                            <table className="admin-md3__table min-w-[780px]">
+                                <thead>
                                     <tr>
-                                        <th className="px-4 py-3">文件</th>
-                                        <th className="px-4 py-3">大小</th>
-                                        <th className="px-4 py-3">分片</th>
-                                        <th className="px-4 py-3">更新时间</th>
-                                        <th className="px-4 py-3">状态</th>
-                                        <th className="px-4 py-3 text-right">操作</th>
+                                        <th>文件</th>
+                                        <th>大小</th>
+                                        <th>分片</th>
+                                        <th>更新时间</th>
+                                        <th>状态</th>
+                                        <th className="text-right">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                                <tbody>
                                     {ragStatus.files.length === 0 ? (
                                         <tr>
                                             <td
                                                 colSpan={6}
-                                                className="px-4 py-10 text-center text-gray-500 dark:text-gray-400"
+                                                className="admin-md3__muted py-10 text-center"
                                             >
                                                 暂无知识文件
                                             </td>
                                         </tr>
                                     ) : ragStatus.files.map((file) => (
                                         <tr key={file.id}>
-                                            <td className="px-4 py-3">
+                                            <td>
                                                 <div className="flex max-w-[320px] items-start gap-2">
                                                     {renderFileTypeIcon(file.name, {
                                                         className: 'mt-0.5 shrink-0',
                                                     })}
                                                     <div className="min-w-0">
-                                                        <div className="truncate font-medium text-gray-950 dark:text-white">
+                                                        <div className="truncate font-medium">
                                                             {file.name}
                                                         </div>
                                                         {file.usedOcr && (
-                                                            <span className="mt-1 inline-flex rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+                                                            <span className="admin-md3__chip admin-md3__chip--info mt-1 text-[11px]">
                                                                 PaddleOCR
                                                             </span>
                                                         )}
-                                                        <div className="text-xs text-gray-500">
+                                                        <div className="admin-md3__muted text-xs">
                                                             {file.sha256 ? file.sha256.slice(0, 12) : '-'}
                                                         </div>
                                                         {file.errorMessage && (
-                                                            <div className="mt-1 truncate text-xs text-red-600 dark:text-red-300">
+                                                            <div className="mt-1 truncate text-xs text-[var(--md-sys-color-error)]">
                                                                 {file.errorMessage}
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                            <td className="admin-md3__muted">
                                                 {formatFileSize(file.size)}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                            <td className="admin-md3__muted">
                                                 {file.chunkCount}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                            <td className="admin-md3__muted">
                                                 {formatDate(file.modifiedAt)}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td>
                                                 <span className={ragFileStatusBadgeClass(file.status, file.indexed)}>
                                                     {ragFileStatusLabel(file.status, file.indexed)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td>
                                                 <div className="flex justify-end">
-                                                    <button
+                                                    <md-icon-button
                                                         type="button"
                                                         onClick={() => void handleRagDelete(file.id, file.name)}
                                                         disabled={saving}
-                                                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-200 dark:hover:bg-red-500/15"
                                                         title="删除"
                                                     >
                                                         <Delete02Icon size={16} />
-                                                    </button>
+                                                    </md-icon-button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1475,45 +1464,45 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151923]">
-                        <h3 className="text-base font-semibold text-gray-950 dark:text-white">
+                    <div className="admin-md3__pane p-5">
+                        <h3 className="text-base font-semibold">
                             向量库
                         </h3>
                         <dl className="mt-4 space-y-3 text-sm">
                             <div>
-                                <dt className="text-gray-500 dark:text-gray-400">Collection</dt>
-                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">Collection</dt>
+                                <dd className="mt-1 break-all font-medium">
                                     {ragStatus.collectionName}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="text-gray-500 dark:text-gray-400">文件目录</dt>
-                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">文件目录</dt>
+                                <dd className="mt-1 break-all font-medium">
                                     {ragStatus.dataPath}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="text-gray-500 dark:text-gray-400">数据库目录</dt>
-                                <dd className="mt-1 break-all font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">数据库目录</dt>
+                                <dd className="mt-1 break-all font-medium">
                                     {ragStatus.persistDirectory}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="text-gray-500 dark:text-gray-400">文件类型</dt>
-                                <dd className="mt-1 font-medium text-gray-900 dark:text-white">
+                                <dt className="admin-md3__muted">文件类型</dt>
+                                <dd className="mt-1 font-medium">
                                     {ragStatus.allowedFileTypes.join(', ')}
                                 </dd>
                             </div>
                         </dl>
-                        <button
+                        <md-filled-button
                             type="button"
                             onClick={() => void handleRagRebuild()}
                             disabled={saving}
-                            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#5b6ef5] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4a5ce0] disabled:cursor-not-allowed disabled:bg-gray-300"
+                            className="mt-5 w-full"
                         >
-                            <Refresh01Icon size={16} className={saving ? 'animate-spin' : ''} />
+                            <Refresh01Icon slot="icon" size={16} className={saving ? 'animate-spin' : ''} />
                             生成数据库
-                        </button>
+                        </md-filled-button>
                     </div>
                 </div>
             </div>
@@ -1523,9 +1512,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     const renderActiveTab = () => {
         if (loading) {
             return (
-                <div className="flex min-h-[320px] items-center justify-center text-gray-500 dark:text-gray-300">
-                    <Refresh01Icon size={18} className="mr-2 animate-spin" />
-                    加载中
+                <div className="admin-md3__muted flex min-h-[320px] items-center justify-center gap-3">
+                    <md-circular-progress indeterminate></md-circular-progress>
+                    <span>加载中</span>
                 </div>
             );
         }
@@ -1558,72 +1547,65 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     };
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col bg-white text-gray-900 dark:bg-[#1a1a1a] dark:text-gray-100">
-            <div className="flex flex-col gap-4 border-b border-gray-200/70 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="admin-md3 flex min-h-0 flex-1 flex-col">
+            <div className="admin-md3__top-app-bar flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                 <div>
-                    <h2 className="text-2xl font-semibold text-gray-950 dark:text-white">
+                    <h2 className="text-2xl font-semibold">
                         Admin 管理中心
                     </h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="admin-md3__muted mt-1 text-sm">
                         数据、用户、对话、模型、联网搜索、OCR 和 RAG 配置
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
+                    <md-icon-button
                         type="button"
                         onClick={() => void refreshAll()}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
                         title="刷新"
                     >
                         <Refresh01Icon size={18} />
-                    </button>
-                    <button
+                    </md-icon-button>
+                    <md-icon-button
                         type="button"
                         onClick={onClose}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
                         title="关闭"
                     >
                         <Cancel01Icon size={18} />
-                    </button>
+                    </md-icon-button>
                 </div>
             </div>
 
-            <div className="border-b border-gray-200/70 px-4 dark:border-white/10 sm:px-6">
-                <div className="flex gap-1 overflow-x-auto py-3">
+            <div className="admin-md3__tab-bar px-4 sm:px-6">
+                <md-tabs
+                    activeTabIndex={activeTabIndex}
+                    onChange={handleTabsChange}
+                >
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
-                        const active = activeTab === tab.key;
                         return (
-                            <button
+                            <md-primary-tab
                                 key={tab.key}
-                                type="button"
-                                onClick={() => setActiveTab(tab.key)}
-                                className={`flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
-                                    active
-                                        ? 'bg-[#eef2ff] text-[#4a5ce0] dark:bg-white/12 dark:text-white'
-                                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white'
-                                }`}
                             >
-                                <Icon size={16} />
+                                <Icon slot="icon" size={16} />
                                 {tab.label}
-                            </button>
+                            </md-primary-tab>
                         );
                     })}
-                </div>
+                </md-tabs>
             </div>
 
             {(errorMessage || statusMessage) && (
                 <div className="px-4 pt-4 sm:px-6">
                     <div className={errorMessage
-                        ? 'rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200'
-                        : 'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'}
+                        ? 'rounded-2xl border border-[var(--md-sys-color-error)] bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)]'
+                        : 'rounded-2xl border border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-primary-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-primary-container)]'}
                     >
                         {errorMessage ?? statusMessage}
                     </div>
                 </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 dark:bg-[#1a1a1a] sm:p-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
                 {renderActiveTab()}
             </div>
         </div>

@@ -1,0 +1,53 @@
+.settings-md3 {
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+}
+
+.settings-md3__top-app-bar {
+    background: var(--md-sys-color-surface-container-low);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.settings-md3__pane {
+    background: var(--md-sys-color-surface-container-low);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+}
+
+.settings-md3__pane-high {
+    background: var(--md-sys-color-surface-container);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+}
+
+.settings-md3__muted {
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+.settings-md3__field {
+    width: 100%;
+}
+
+.settings-md3__background-option {
+    border: 2px solid transparent;
+    border-radius: 16px;
+    display: block;
+    height: 5rem;
+    overflow: hidden;
+    transition: border-color 160ms ease, transform 160ms ease;
+    width: 8rem;
+}
+
+.settings-md3__background-option:hover {
+    transform: translateY(-1px);
+}
+
+.settings-md3__background-option--active {
+    border-color: var(--md-sys-color-primary);
+}
+
+.settings-md3__background-option img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}

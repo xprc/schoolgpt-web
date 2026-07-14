@@ -1,4 +1,4 @@
-import type { Conversation, ConversationSummary } from './types';
+import type { Conversation, ConversationSummary } from '../types';
 
 type StoredConversation = Conversation & {
     userId: number;

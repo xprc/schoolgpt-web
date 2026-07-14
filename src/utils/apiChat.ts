@@ -1,6 +1,6 @@
 import { apiBaseUrl } from './apiConfig';
 import { getAccessToken } from './auth';
-import type { Message, RagSource } from './types';
+import type { Message, RagSource } from '../types';
 
 export class ApiAuthError extends Error {
     constructor(message: string) {
