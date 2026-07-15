@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import {
     ArrowDown01Icon,
+    ArrowLeft01Icon,
+    ArrowRight01Icon,
     ArrowUp01Icon,
     Cancel01Icon,
     File01Icon,
     Refresh01Icon,
     Search01Icon,
+    ZoomInAreaIcon,
+    ZoomOutAreaIcon,
 } from 'hugeicons-react';
 import { ApiAuthError } from '../utils/apiChat';
 import {
@@ -20,7 +25,7 @@ import {
 } from '../utils/apiRagFiles';
 import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export type RagFileOpenRequest = {
     fileId?: number;
@@ -41,18 +46,8 @@ const PDF_BASE_SCALE = 1.3;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.4;
 const ZOOM_STEP = 0.2;
-const PAGES_AROUND_VIEWPORT = 2;
 const DEFAULT_PAGE_WIDTH = 794;
 const DEFAULT_PAGE_HEIGHT = 1123;
-
-type PageRenderStatus = 'idle' | 'rendering' | 'rendered' | 'error';
-
-type PageRenderInfo = {
-    status: PageRenderStatus;
-    width: number;
-    height: number;
-    error?: string;
-};
 
 type ScrollTarget = {
     page: number;
@@ -61,22 +56,6 @@ type ScrollTarget = {
 
 const clampNumber = (value: number, min: number, max: number): number => {
     return Math.min(Math.max(value, min), max);
-};
-
-const createPageRange = (centerPage: number, pageCount: number): { start: number; end: number } => {
-    if (pageCount <= 0) {
-        return { start: 1, end: 1 };
-    }
-
-    const safeCenterPage = clampNumber(centerPage, 1, pageCount);
-    return {
-        start: Math.max(1, safeCenterPage - PAGES_AROUND_VIEWPORT),
-        end: Math.min(pageCount, safeCenterPage + PAGES_AROUND_VIEWPORT),
-    };
-};
-
-const isRenderCancelled = (error: unknown): boolean => {
-    return error instanceof Error && error.name === 'RenderingCancelledException';
 };
 
 const formatFileSize = (value: number): string => {
@@ -120,10 +99,6 @@ export default function RagFileBrowser({
 }: RagFileBrowserProps) {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const pageRefs = useRef<Map<number, HTMLElement>>(new Map());
-    const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
-    const renderTasksRef = useRef<Map<number, RenderTask>>(new Map());
-    const renderedPagesRef = useRef<Record<number, PageRenderInfo>>({});
-    const renderGenerationRef = useRef(0);
     const scrollFrameRef = useRef<number | null>(null);
     const scrollTargetNonceRef = useRef(0);
     const [files, setFiles] = useState<RagFileSummary[]>([]);
@@ -132,42 +107,22 @@ export default function RagFileBrowser({
     const [loadingList, setLoadingList] = useState(false);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [loadingPreview, setLoadingPreview] = useState(false);
-    const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
+    const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [pageCount, setPageCount] = useState(0);
-    const [visiblePageRange, setVisiblePageRange] = useState(() => createPageRange(1, 1));
-    const [renderedPages, setRenderedPages] = useState<Record<number, PageRenderInfo>>({});
     const [scrollTarget, setScrollTarget] = useState<ScrollTarget | null>(null);
     const [zoom, setZoom] = useState(1);
     const [previewError, setPreviewError] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false);
 
-    const cancelRenderTasks = () => {
-        renderTasksRef.current.forEach((task) => {
-            task.cancel();
-        });
-        renderTasksRef.current.clear();
-    };
+    const pdfFile = useMemo(() => {
+        if (!pdfData) {
+            return null;
+        }
 
-    const invalidateRenderTasks = () => {
-        cancelRenderTasks();
-        renderGenerationRef.current += 1;
-    };
-
-    const resetPageRenderState = () => {
-        invalidateRenderTasks();
-        renderedPagesRef.current = {};
-        setRenderedPages({});
-    };
-
-    const setPageRenderInfo = (nextPageNumber: number, nextInfo: PageRenderInfo) => {
-        renderedPagesRef.current = {
-            ...renderedPagesRef.current,
-            [nextPageNumber]: nextInfo,
-        };
-        setRenderedPages(renderedPagesRef.current);
-    };
+        return { data: pdfData };
+    }, [pdfData]);
 
     const queueScrollToPage = (nextPageNumber: number, nextPageCount = pageCount) => {
         if (nextPageCount <= 0) {
@@ -176,7 +131,6 @@ export default function RagFileBrowser({
 
         const safePageNumber = clampNumber(nextPageNumber, 1, nextPageCount);
         setPageNumber(safePageNumber);
-        setVisiblePageRange(createPageRange(safePageNumber, nextPageCount));
         scrollTargetNonceRef.current += 1;
         setScrollTarget({
             page: safePageNumber,
@@ -306,14 +260,10 @@ export default function RagFileBrowser({
 
     useEffect(() => {
         let cancelled = false;
-        let loadingTask: PDFDocumentLoadingTask | null = null;
 
-        resetPageRenderState();
-
-        setPdfDocument(null);
+        setPdfData(null);
         setPageCount(0);
         setPageNumber(1);
-        setVisiblePageRange(createPageRange(1, 1));
         setScrollTarget(null);
         setPreviewError('');
 
@@ -334,25 +284,10 @@ export default function RagFileBrowser({
             })
             .then((arrayBuffer) => {
                 if (cancelled || !arrayBuffer) {
-                    return null;
-                }
-
-                loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-                return loadingTask.promise;
-            })
-            .then((nextDocument) => {
-                if (!nextDocument) {
                     return;
                 }
 
-                if (cancelled) {
-                    void nextDocument.loadingTask.destroy();
-                    return;
-                }
-
-                setPdfDocument(nextDocument);
-                setPageCount(nextDocument.numPages);
-                queueScrollToPage(targetPageNumber ?? 1, nextDocument.numPages);
+                setPdfData(new Uint8Array(arrayBuffer));
             })
             .catch((error: unknown) => {
                 if (cancelled) {
@@ -374,39 +309,12 @@ export default function RagFileBrowser({
 
         return () => {
             cancelled = true;
-            invalidateRenderTasks();
-            if (loadingTask) {
-                void loadingTask.destroy();
-            }
         };
     }, [detailId, detailStatus, isOpen, onAuthExpired]);
 
     const pageNumbers = useMemo(() => {
         return Array.from({ length: pageCount }, (_, index) => index + 1);
     }, [pageCount]);
-
-    const activeRenderPageNumbers = useMemo(() => {
-        if (pageCount <= 0) {
-            return [];
-        }
-
-        const start = clampNumber(visiblePageRange.start, 1, pageCount);
-        const end = clampNumber(visiblePageRange.end, start, pageCount);
-        const nextPageNumbers: number[] = [];
-        for (let nextPageNumber = start; nextPageNumber <= end; nextPageNumber += 1) {
-            nextPageNumbers.push(nextPageNumber);
-        }
-
-        return nextPageNumbers;
-    }, [pageCount, visiblePageRange]);
-
-    const activeRenderPageSet = useMemo(() => {
-        return new Set(activeRenderPageNumbers);
-    }, [activeRenderPageNumbers]);
-
-    const isRenderingVisiblePage = activeRenderPageNumbers.some((nextPageNumber) => {
-        return renderedPages[nextPageNumber]?.status === 'rendering';
-    });
 
     const updateVisiblePagesFromScroll = () => {
         const container = scrollContainerRef.current;
@@ -443,14 +351,6 @@ export default function RagFileBrowser({
         setPageNumber((currentPageNumber) => (
             currentPageNumber === safePageNumber ? currentPageNumber : safePageNumber
         ));
-        setVisiblePageRange((currentRange) => {
-            const nextRange = createPageRange(safePageNumber, pageCount);
-            if (currentRange.start === nextRange.start && currentRange.end === nextRange.end) {
-                return currentRange;
-            }
-
-            return nextRange;
-        });
     };
 
     const handlePreviewScroll = () => {
@@ -473,22 +373,13 @@ export default function RagFileBrowser({
         pageRefs.current.delete(nextPageNumber);
     };
 
-    const setCanvasElement = (nextPageNumber: number, element: HTMLCanvasElement | null) => {
-        if (element) {
-            canvasRefs.current.set(nextPageNumber, element);
-            return;
-        }
-
-        canvasRefs.current.delete(nextPageNumber);
-    };
-
     useEffect(() => {
-        if (!pdfDocument || !targetPageNumber || pageCount <= 0) {
+        if (!targetPageNumber || pageCount <= 0) {
             return;
         }
 
         queueScrollToPage(targetPageNumber, pageCount);
-    }, [pageCount, pdfDocument, targetPageNumber, openRequest?.nonce]);
+    }, [pageCount, targetPageNumber, openRequest?.nonce]);
 
     useEffect(() => {
         if (!scrollTarget || pageCount <= 0) {
@@ -510,145 +401,7 @@ export default function RagFileBrowser({
         return () => {
             window.cancelAnimationFrame(frameId);
         };
-    }, [pageCount, pdfDocument, scrollTarget, zoom]);
-
-    useEffect(() => {
-        if (!pdfDocument || pageCount <= 0) {
-            return;
-        }
-
-        resetPageRenderState();
-    }, [pdfDocument, zoom]);
-
-    useEffect(() => {
-        if (!pdfDocument || pageCount <= 0) {
-            return;
-        }
-
-        const activePages = new Set(activeRenderPageNumbers);
-        renderTasksRef.current.forEach((task, taskPageNumber) => {
-            if (!activePages.has(taskPageNumber)) {
-                task.cancel();
-                renderTasksRef.current.delete(taskPageNumber);
-            }
-        });
-
-        let nextRenderedPages = renderedPagesRef.current;
-        let hasChangedRenderedPages = false;
-        Object.entries(nextRenderedPages).forEach(([pageKey, pageInfo]) => {
-            const candidatePageNumber = Number(pageKey);
-            if (activePages.has(candidatePageNumber) || pageInfo.status === 'idle') {
-                return;
-            }
-
-            if (!hasChangedRenderedPages) {
-                nextRenderedPages = { ...nextRenderedPages };
-                hasChangedRenderedPages = true;
-            }
-
-            nextRenderedPages[candidatePageNumber] = {
-                ...pageInfo,
-                status: 'idle',
-                error: undefined,
-            };
-        });
-
-        if (hasChangedRenderedPages) {
-            renderedPagesRef.current = nextRenderedPages;
-            setRenderedPages(nextRenderedPages);
-        }
-
-        const renderGeneration = renderGenerationRef.current;
-        activeRenderPageNumbers.forEach((candidatePageNumber) => {
-            const currentPageInfo = renderedPagesRef.current[candidatePageNumber];
-            if (currentPageInfo?.status === 'rendering' || currentPageInfo?.status === 'rendered') {
-                return;
-            }
-
-            const canvas = canvasRefs.current.get(candidatePageNumber);
-            if (!canvas) {
-                return;
-            }
-
-            const fallbackWidth = currentPageInfo?.width ?? DEFAULT_PAGE_WIDTH * zoom;
-            const fallbackHeight = currentPageInfo?.height ?? DEFAULT_PAGE_HEIGHT * zoom;
-            setPageRenderInfo(candidatePageNumber, {
-                status: 'rendering',
-                width: fallbackWidth,
-                height: fallbackHeight,
-            });
-
-            let currentRenderTask: RenderTask | null = null;
-            pdfDocument
-                .getPage(candidatePageNumber)
-                .then((page) => {
-                    if (
-                        renderGenerationRef.current !== renderGeneration
-                        || canvasRefs.current.get(candidatePageNumber) !== canvas
-                    ) {
-                        return null;
-                    }
-
-                    const viewport = page.getViewport({ scale: PDF_BASE_SCALE * zoom });
-                    const pixelRatio = window.devicePixelRatio || 1;
-                    canvas.width = Math.floor(viewport.width * pixelRatio);
-                    canvas.height = Math.floor(viewport.height * pixelRatio);
-                    canvas.style.width = `${Math.floor(viewport.width)}px`;
-                    canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-                    setPageRenderInfo(candidatePageNumber, {
-                        status: 'rendering',
-                        width: Math.floor(viewport.width),
-                        height: Math.floor(viewport.height),
-                    });
-
-                    const nextRenderTask = page.render({
-                        canvas,
-                        viewport,
-                        transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0],
-                        background: 'rgb(255, 255, 255)',
-                    });
-                    currentRenderTask = nextRenderTask;
-                    renderTasksRef.current.set(candidatePageNumber, nextRenderTask);
-                    return nextRenderTask.promise.then(() => ({
-                        height: Math.floor(viewport.height),
-                        renderTask: nextRenderTask,
-                        width: Math.floor(viewport.width),
-                    }));
-                })
-                .then((result) => {
-                    if (!result || renderGenerationRef.current !== renderGeneration) {
-                        return;
-                    }
-
-                    if (renderTasksRef.current.get(candidatePageNumber) === result.renderTask) {
-                        renderTasksRef.current.delete(candidatePageNumber);
-                    }
-
-                    setPageRenderInfo(candidatePageNumber, {
-                        status: 'rendered',
-                        width: result.width,
-                        height: result.height,
-                    });
-                })
-                .catch((error: unknown) => {
-                    if (currentRenderTask && renderTasksRef.current.get(candidatePageNumber) === currentRenderTask) {
-                        renderTasksRef.current.delete(candidatePageNumber);
-                    }
-
-                    if (isRenderCancelled(error) || renderGenerationRef.current !== renderGeneration) {
-                        return;
-                    }
-
-                    setPageRenderInfo(candidatePageNumber, {
-                        status: 'error',
-                        width: fallbackWidth,
-                        height: fallbackHeight,
-                        error: '页面渲染失败',
-                    });
-                });
-        });
-    }, [activeRenderPageNumbers, pageCount, pdfDocument, zoom]);
+    }, [pageCount, scrollTarget, zoom]);
 
     useEffect(() => {
         return () => {
@@ -656,10 +409,38 @@ export default function RagFileBrowser({
                 window.cancelAnimationFrame(scrollFrameRef.current);
                 scrollFrameRef.current = null;
             }
-
-            invalidateRenderTasks();
         };
     }, []);
+
+    const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+        setPreviewError('');
+        setPageCount(numPages);
+        queueScrollToPage(targetPageNumber ?? 1, numPages);
+    };
+
+    const handleDocumentLoadError = (error: Error) => {
+        setPageCount(0);
+        setPreviewError(error.message || 'PDF 预览加载失败');
+    };
+
+    const renderPdfPageState = (message: string): ReactNode => (
+        <div
+            className="flex items-center justify-center bg-white text-sm text-gray-500 dark:text-gray-500"
+            style={{
+                height: Math.round(DEFAULT_PAGE_HEIGHT * zoom),
+                width: Math.round(DEFAULT_PAGE_WIDTH * zoom),
+            }}
+        >
+            {message === '渲染中' ? (
+                <span className="flex items-center gap-2">
+                    <Refresh01Icon size={15} className="animate-spin" />
+                    {message}
+                </span>
+            ) : (
+                message
+            )}
+        </div>
+    );
 
     const goToPreviousPage = () => {
         queueScrollToPage(pageNumber - 1, pageCount);
@@ -867,7 +648,7 @@ export default function RagFileBrowser({
                             <div className="m-5 rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
                                 {previewError}
                             </div>
-                        ) : !pdfDocument || pageCount <= 0 ? (
+                        ) : !pdfFile ? (
                             <div className="flex h-full items-center justify-center font-sans text-sm text-gray-500 dark:text-gray-300">
                                 PDF 预览尚未生成
                             </div>
@@ -878,25 +659,25 @@ export default function RagFileBrowser({
                                         <button
                                             type="button"
                                             onClick={goToPreviousPage}
-                                            disabled={pageNumber <= 1}
+                                            disabled={pageCount <= 0 || pageNumber <= 1}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
                                             aria-label="上一页"
                                             title="上一页"
                                         >
-                                            &lt;
+                                            <ArrowLeft01Icon size={16} />
                                         </button>
                                         <div className="min-w-24 text-center text-sm text-gray-700 dark:text-gray-200">
-                                            {pageNumber} / {pageCount}
+                                            {pageCount > 0 ? `${pageNumber} / ${pageCount}` : '加载中'}
                                         </div>
                                         <button
                                             type="button"
                                             onClick={goToNextPage}
-                                            disabled={pageNumber >= pageCount}
+                                            disabled={pageCount <= 0 || pageNumber >= pageCount}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
                                             aria-label="下一页"
                                             title="下一页"
                                         >
-                                            &gt;
+                                            <ArrowRight01Icon size={16} />
                                         </button>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -908,7 +689,7 @@ export default function RagFileBrowser({
                                             aria-label="缩小"
                                             title="缩小"
                                         >
-                                            -
+                                            <ZoomOutAreaIcon size={16} />
                                         </button>
                                         <button
                                             type="button"
@@ -926,7 +707,7 @@ export default function RagFileBrowser({
                                             aria-label="放大"
                                             title="放大"
                                         >
-                                            +
+                                            <ZoomInAreaIcon size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -935,69 +716,57 @@ export default function RagFileBrowser({
                                     onScroll={handlePreviewScroll}
                                     className="relative min-h-0 flex-1 overflow-auto bg-gray-100 px-3 py-4 dark:bg-[#0b1120]"
                                 >
-                                    {isRenderingVisiblePage && (
-                                        <div className="pointer-events-none sticky top-3 z-10 mx-auto flex w-fit items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm text-gray-500 shadow-sm dark:bg-[#111827]/90 dark:text-gray-300">
-                                            <Refresh01Icon size={15} className="animate-spin" />
-                                            渲染中
-                                        </div>
-                                    )}
-                                    <div className="mx-auto flex w-fit min-w-full flex-col items-center gap-4">
-                                        {pageNumbers.map((currentPageNumber) => {
-                                            const pageInfo = renderedPages[currentPageNumber];
-                                            const shouldRenderPage = activeRenderPageSet.has(currentPageNumber);
-                                            const pageStatus = pageInfo?.status ?? 'idle';
-                                            const pageWidth = Math.round(pageInfo?.width ?? DEFAULT_PAGE_WIDTH * zoom);
-                                            const pageHeight = Math.round(pageInfo?.height ?? DEFAULT_PAGE_HEIGHT * zoom);
-
-                                            return (
-                                                <section
-                                                    key={currentPageNumber}
-                                                    ref={(element) => setPageElement(currentPageNumber, element)}
-                                                    className="flex w-fit flex-col items-center gap-2"
-                                                    data-page-number={currentPageNumber}
+                                    <Document
+                                        file={pdfFile}
+                                        onLoadSuccess={handleDocumentLoadSuccess}
+                                        onLoadError={handleDocumentLoadError}
+                                        className="mx-auto flex w-fit min-w-full flex-col items-center gap-4"
+                                        loading={(
+                                            <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-300">
+                                                <Refresh01Icon size={15} className="animate-spin" />
+                                                PDF 解析中
+                                            </div>
+                                        )}
+                                        error={(
+                                            <div className="rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+                                                PDF 预览加载失败
+                                            </div>
+                                        )}
+                                        noData={(
+                                            <div className="flex min-h-64 items-center justify-center text-sm text-gray-500 dark:text-gray-300">
+                                                PDF 预览尚未生成
+                                            </div>
+                                        )}
+                                    >
+                                        {pageNumbers.map((currentPageNumber) => (
+                                            <section
+                                                key={currentPageNumber}
+                                                ref={(element) => setPageElement(currentPageNumber, element)}
+                                                className="flex w-fit flex-col items-center gap-2"
+                                                data-page-number={currentPageNumber}
+                                            >
+                                                <div
+                                                    className={`text-xs ${
+                                                        pageNumber === currentPageNumber
+                                                            ? 'font-semibold text-blue-600 dark:text-blue-300'
+                                                            : 'text-gray-500 dark:text-gray-400'
+                                                    }`}
                                                 >
-                                                    <div
-                                                        className={`text-xs ${
-                                                            pageNumber === currentPageNumber
-                                                                ? 'font-semibold text-blue-600 dark:text-blue-300'
-                                                                : 'text-gray-500 dark:text-gray-400'
-                                                        }`}
-                                                    >
-                                                        第 {currentPageNumber} 页
-                                                    </div>
-                                                    <div
-                                                        className="relative overflow-hidden rounded-sm bg-white shadow"
-                                                        style={{
-                                                            height: pageHeight,
-                                                            width: pageWidth,
-                                                        }}
-                                                    >
-                                                        {shouldRenderPage && (
-                                                            <canvas
-                                                                ref={(element) => setCanvasElement(currentPageNumber, element)}
-                                                                className={`block max-w-none ${
-                                                                    pageStatus === 'rendered' ? '' : 'opacity-0'
-                                                                }`}
-                                                                aria-label={`${detail?.name ?? '文件预览'} 第 ${currentPageNumber} 页`}
-                                                            />
-                                                        )}
-                                                        {shouldRenderPage && pageStatus !== 'rendered' && (
-                                                            <div className="absolute inset-0 flex items-center justify-center bg-white text-sm text-gray-500 dark:text-gray-500">
-                                                                {pageStatus === 'error' ? (
-                                                                    pageInfo?.error ?? '页面渲染失败'
-                                                                ) : (
-                                                                    <span className="flex items-center gap-2">
-                                                                        <Refresh01Icon size={15} className="animate-spin" />
-                                                                        渲染中
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </section>
-                                            );
-                                        })}
-                                    </div>
+                                                    第 {currentPageNumber} 页
+                                                </div>
+                                                <div aria-label={`${detail?.name ?? '文件预览'} 第 ${currentPageNumber} 页`}>
+                                                    <Page
+                                                        pageNumber={currentPageNumber}
+                                                        scale={PDF_BASE_SCALE * zoom}
+                                                        className="overflow-hidden rounded-sm bg-white shadow [&_canvas]:!block [&_canvas]:!max-w-none"
+                                                        loading={renderPdfPageState('渲染中')}
+                                                        error={renderPdfPageState('页面渲染失败')}
+                                                        noData={renderPdfPageState('页面暂不可用')}
+                                                    />
+                                                </div>
+                                            </section>
+                                        ))}
+                                    </Document>
                                 </div>
                             </div>
                         )}

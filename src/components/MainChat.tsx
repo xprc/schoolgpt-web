@@ -297,10 +297,10 @@ export default function MainChat({
 
     const toggleSpeak = (id: string, content: string) => {
         if (speakingId === id) {
-            window.speechSynthesis.cancel();
+            window.speechSynthesis?.cancel();
             setSpeakingId(null);
         } else {
-            window.speechSynthesis.cancel();
+            window.speechSynthesis?.cancel();
             const utterance = new SpeechSynthesisUtterance(content);
             utterance.onend = () => setSpeakingId(null);
             utterance.onerror = () => setSpeakingId(null);
@@ -311,7 +311,7 @@ export default function MainChat({
 
     useEffect(() => {
         return () => {
-            window.speechSynthesis.cancel();
+            window.speechSynthesis?.cancel();
         };
     }, []);
 
