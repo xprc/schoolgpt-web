@@ -1,6 +1,7 @@
 import { apiBaseUrl } from './config';
 import { ApiAuthError } from './chat';
 import { getAccessToken } from '../utils/authSession';
+import i18n from '../utils/i18n';
 import type { UserMemory } from '../types';
 
 type UserMemoryResponse = {
@@ -23,7 +24,7 @@ export class MemoryApiError extends Error {
 const authHeaders = (): HeadersInit => {
     const accessToken = getAccessToken();
     if (!accessToken) {
-        throw new ApiAuthError('请先登录');
+        throw new ApiAuthError(i18n.t('errors.authRequired'));
     }
 
     return {
@@ -58,7 +59,7 @@ const readErrorMessage = async (response: Response): Promise<string> => {
         // Ignore malformed error bodies.
     }
 
-    return '请求失败';
+    return i18n.t('errors.memoryRequestFailed');
 };
 
 const ensureOk = async (response: Response): Promise<void> => {
@@ -67,7 +68,7 @@ const ensureOk = async (response: Response): Promise<void> => {
     }
 
     if (response.status === 401) {
-        throw new ApiAuthError('登录已过期，请重新登录');
+        throw new ApiAuthError(i18n.t('errors.sessionExpired'));
     }
 
     throw new MemoryApiError(response.status, await readErrorMessage(response));

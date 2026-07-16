@@ -1,6 +1,7 @@
 import { apiBaseUrl } from './config';
 import { getAccessToken } from '../utils/authSession';
 import { ApiAuthError } from './chat';
+import i18n from '../utils/i18n';
 import type {
     Conversation,
     ConversationShareScope,
@@ -76,16 +77,16 @@ const readErrorMessage = async (response: Response): Promise<string> => {
             return payload.detail;
         }
     } catch {
-        return '请求失败，请稍后重试';
+        return i18n.t('errors.requestFailed');
     }
 
-    return '请求失败，请稍后重试';
+    return i18n.t('errors.requestFailed');
 };
 
 const authHeaders = (): HeadersInit => {
     const accessToken = getAccessToken();
     if (!accessToken) {
-        throw new ApiAuthError('请先登录');
+        throw new ApiAuthError(i18n.t('errors.authRequired'));
     }
 
     return {
@@ -106,7 +107,7 @@ const ensureOk = async (response: Response): Promise<void> => {
     }
 
     if (response.status === 401) {
-        throw new ApiAuthError('登录已过期，请重新登录');
+        throw new ApiAuthError(i18n.t('errors.sessionExpired'));
     }
 
     throw new ApiRequestError(response.status, await readErrorMessage(response));

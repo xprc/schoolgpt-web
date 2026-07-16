@@ -1,5 +1,6 @@
 import { apiBaseUrl } from './config';
 import { getAccessToken } from '../utils/authSession';
+import i18n from '../utils/i18n';
 import type { Message, RagSource } from '../types';
 
 export class ApiAuthError extends Error {
@@ -144,7 +145,7 @@ export const streamChat = async (
 ): Promise<void> => {
     const accessToken = getAccessToken();
     if (!accessToken) {
-        throw new ApiAuthError('请先登录');
+        throw new ApiAuthError(i18n.t('errors.authRequired'));
     }
 
     const response = await fetch(`${apiBaseUrl}/chat`, {
@@ -177,15 +178,15 @@ export const streamChat = async (
 
     if (!response.ok) {
         if (response.status === 401) {
-            throw new ApiAuthError('登录已过期，请重新登录');
+            throw new ApiAuthError(i18n.t('errors.sessionExpired'));
         }
 
-        throw new Error('网络请求失败');
+        throw new Error(i18n.t('errors.networkFailed'));
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-        throw new Error('无法读取响应流');
+        throw new Error(i18n.t('errors.streamUnavailable'));
     }
 
     const decoder = new TextDecoder('utf-8');

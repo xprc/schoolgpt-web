@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Refresh01Icon, Tick02Icon } from 'hugeicons-react';
 import {
     submitFirstRunSetup,
@@ -20,13 +21,17 @@ const defaultForm: FirstRunSetupPayload = {
     adminUsername: 'admin',
     adminEmail: 'admin@schoolgpt.local',
     adminPassword: '',
-    adminDisplayName: '校园百事通管理员',
+    adminDisplayName: '',
 };
 
 export default function FirstRunSetupPage({
     onSetupComplete,
 }: FirstRunSetupPageProps) {
-    const [form, setForm] = useState<FirstRunSetupPayload>(defaultForm);
+    const { t } = useTranslation();
+    const [form, setForm] = useState<FirstRunSetupPayload>(() => ({
+        ...defaultForm,
+        adminDisplayName: t('setup.defaultAdminName'),
+    }));
     const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -66,10 +71,10 @@ export default function FirstRunSetupPage({
             >
                 <div className="mb-6">
                     <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">
-                        首次运行设置
+                        {t('setup.title')}
                     </h1>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        填写数据库连接和管理员账号后开始使用
+                        {t('setup.subtitle')}
                     </p>
                 </div>
 
@@ -82,11 +87,11 @@ export default function FirstRunSetupPage({
                 <div className="grid gap-5 md:grid-cols-2">
                     <section className="space-y-4">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                            数据库
+                            {t('setup.database')}
                         </h2>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                主机
+                                {t('setup.host')}
                             </span>
                             <input
                                 value={form.database.host}
@@ -96,7 +101,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                端口
+                                {t('setup.port')}
                             </span>
                             <input
                                 type="number"
@@ -111,7 +116,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                数据库名
+                                {t('setup.databaseName')}
                             </span>
                             <input
                                 value={form.database.database}
@@ -123,7 +128,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                用户名
+                                {t('setup.username')}
                             </span>
                             <input
                                 value={form.database.username}
@@ -135,7 +140,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                密码
+                                {t('setup.password')}
                             </span>
                             <input
                                 type="password"
@@ -150,11 +155,11 @@ export default function FirstRunSetupPage({
 
                     <section className="space-y-4">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                            管理员
+                            {t('setup.admin')}
                         </h2>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                用户名
+                                {t('setup.username')}
                             </span>
                             <input
                                 value={form.adminUsername}
@@ -169,7 +174,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                显示名称
+                                {t('setup.displayName')}
                             </span>
                             <input
                                 value={form.adminDisplayName}
@@ -184,7 +189,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                邮箱
+                                {t('setup.email')}
                             </span>
                             <input
                                 type="email"
@@ -200,7 +205,7 @@ export default function FirstRunSetupPage({
                         </label>
                         <label className="block">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                密码
+                                {t('setup.password')}
                             </span>
                             <input
                                 type="password"
@@ -228,7 +233,7 @@ export default function FirstRunSetupPage({
                         ) : (
                             <Tick02Icon size={16} />
                         )}
-                        初始化
+                        {t('setup.submit')}
                     </button>
                 </div>
             </form>

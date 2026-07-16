@@ -1,14 +1,17 @@
+import { useTranslation } from 'react-i18next';
 import type { SearchSource } from '../types';
 
 type SearchSourceListProps = {
     sources: SearchSource[];
 };
 
-const sourceLabel = (source: SearchSource): string => {
-    return source.host || source.title || `来源 ${source.index}`;
+const sourceLabel = (source: SearchSource, fallback: string): string => {
+    return source.host || source.title || fallback;
 };
 
 export default function SearchSourceList({ sources }: SearchSourceListProps) {
+    const { t } = useTranslation();
+
     if (sources.length === 0) {
         return null;
     }
@@ -16,7 +19,7 @@ export default function SearchSourceList({ sources }: SearchSourceListProps) {
     return (
         <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <span>搜索来源</span>
+                <span>{t('sources.heading')}</span>
                 <span className="font-medium text-gray-400 dark:text-gray-500">
                     · {sources.length}
                 </span>
@@ -34,10 +37,12 @@ export default function SearchSourceList({ sources }: SearchSourceListProps) {
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-semibold text-white dark:bg-white dark:text-gray-900">
                                 {source.index}
                             </span>
-                            <span className="truncate">{sourceLabel(source)}</span>
+                            <span className="truncate">
+                                {sourceLabel(source, t('sources.fallback', { index: source.index }))}
+                            </span>
                         </div>
                         <div className="mt-2 truncate text-sm font-semibold text-gray-950 group-hover:text-[#4a5ce0] dark:text-white dark:group-hover:text-blue-200">
-                            {source.title}
+                            {source.title || t('sources.fallback', { index: source.index })}
                         </div>
                         {source.description && (
                             <div className="mt-1 max-h-10 overflow-hidden text-xs leading-5 text-gray-500 dark:text-gray-400">

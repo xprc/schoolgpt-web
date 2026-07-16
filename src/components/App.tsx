@@ -66,7 +66,7 @@ const MainChat = lazy(() => import('./MainChat'));
 const ProfilePanel = lazy(() => import('./ProfilePanel'));
 const RagFileBrowser = lazy(() => import('./RagFileBrowser'));
 
-const defaultConversationTitle = '新对话';
+const defaultConversationTitle = '';
 const draftConversationId = '';
 const chatRouteIdPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,17 +75,25 @@ const isConversationRouteId = (value: string | undefined): value is string => {
     return Boolean(value && chatRouteIdPattern.test(value));
 };
 
-const PageLoadingFallback = () => (
-    <div className="relative z-10 flex min-h-screen w-full items-center justify-center text-sm text-white/75">
-        正在加载页面
-    </div>
-);
+const PageLoadingFallback = () => {
+    const { t } = useTranslation();
 
-const ContentLoadingFallback = () => (
-    <div className="flex min-h-0 flex-1 items-center justify-center pt-16 text-white/75">
-        正在加载页面
-    </div>
-);
+    return (
+        <div className="relative z-10 flex min-h-screen w-full items-center justify-center text-sm text-white/75">
+            {t('loadingPage')}
+        </div>
+    );
+};
+
+const ContentLoadingFallback = () => {
+    const { t } = useTranslation();
+
+    return (
+        <div className="flex min-h-0 flex-1 items-center justify-center pt-16 text-white/75">
+            {t('loadingPage')}
+        </div>
+    );
+};
 
 const createConversationId = (): string => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -1124,7 +1132,7 @@ export default function App() {
             >
                 <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
                 <div className="relative z-10 rounded-lg border border-white/25 bg-black/30 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
-                    {setupError ?? '正在检查首次运行状态'}
+                    {setupError ?? t('checkingSetup')}
                 </div>
             </div>
         );
@@ -1180,7 +1188,7 @@ export default function App() {
                         <div className="w-8 h-8 rounded-sm items-center justify-center hidden sm:flex">
                             <img src="/favicon.ico" />
                         </div>
-                        <span className="hidden sm:inline">校园百事通</span>
+                        <span className="hidden sm:inline">{t('appName')}</span>
                     </span>
                 </div>
 
@@ -1294,7 +1302,7 @@ export default function App() {
                                 setShowProfilePanel(false);
                                 navigate('/admin');
                             }}
-                            title="Admin 管理中心"
+                            title={t('admin.title')}
                             className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block"
                         >
                             <GridIcon size={20} />
@@ -1307,7 +1315,7 @@ export default function App() {
                     >
                         <img
                             src={avatarUrl}
-                            alt="Profile"
+                            alt={t('profile')}
                             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-white/20 transition-transform hover:scale-105 object-cover"
                         />
                     </button>
@@ -1326,7 +1334,7 @@ export default function App() {
             <div className="absolute inset-0 flex overflow-hidden z-10 sm:pl-0">
                 <button
                     type="button"
-                    aria-label="Close sidebar"
+                    aria-label={t('close')}
                     onClick={() => setIsSidebarOpen(false)}
                     className={`absolute inset-0 z-10 bg-black/15 transition-opacity sm:hidden ${
                         isSidebarOpen

@@ -67,5 +67,238 @@
   "renameConversation": "重命名",
   "renameInputPlaceholder": "对话名称",
   "deleteConversation": "删除",
-  "deleteConversationConfirm": "删除“{{title}}”？"
+  "deleteConversationConfirm": "删除“{{title}}”？",
+  "appName": "校园百事通",
+  "loading": "加载中",
+  "loadingPage": "正在加载页面",
+  "checkingSetup": "正在检查首次运行状态",
+  "close": "关闭",
+  "refresh": "刷新",
+  "backHome": "返回首页",
+  "profile": "个人资料",
+  "copy": "复制",
+  "speak": "朗读",
+  "backgroundPreview": "背景预览",
+  "notConfigured": "未配置",
+  "configured": "已配置",
+  "enabled": "启用",
+  "disabled": "停用",
+  "savedApiKey": "已保存 {{mask}}",
+  "errors": {
+    "requestFailed": "请求失败，请稍后重试",
+    "loginFailed": "登录失败，请稍后重试",
+    "authRequired": "请先登录",
+    "sessionExpired": "登录已过期，请重新登录",
+    "networkFailed": "网络请求失败",
+    "streamUnavailable": "无法读取响应流",
+    "memoryRequestFailed": "请求失败",
+    "setupFailed": "初始化失败，请稍后重试"
+  },
+  "setup": {
+    "title": "首次运行设置",
+    "subtitle": "填写数据库连接和管理员账号后开始使用",
+    "database": "数据库",
+    "host": "主机",
+    "port": "端口",
+    "databaseName": "数据库名",
+    "username": "用户名",
+    "password": "密码",
+    "admin": "管理员",
+    "displayName": "显示名称",
+    "email": "邮箱",
+    "submit": "初始化",
+    "defaultAdminName": "校园百事通管理员"
+  },
+  "settingsPage": {
+    "memories": {
+      "title": "记忆",
+      "search": "搜索记忆",
+      "draft": "写入一条长期记忆",
+      "editing": "正在编辑",
+      "count": "{{count}} 条记忆",
+      "cancel": "取消",
+      "saving": "保存中",
+      "add": "添加",
+      "loading": "正在加载",
+      "empty": "暂无记忆",
+      "edit": "编辑",
+      "delete": "删除",
+      "deleteConfirm": "确定删除这条记忆？"
+    }
+  },
+  "sources": {
+    "heading": "搜索来源",
+    "fallback": "来源 {{index}}"
+  },
+  "chatDetails": {
+    "requestError": "请求出错：{{message}}",
+    "rag": {
+      "title": "RAG 来源",
+      "summary": "{{files}} 个文件 · {{chunks}} 个片段",
+      "legacyUnavailable": "旧来源不可打开",
+      "fileSnippetCount": "{{count}} 个相关片段",
+      "pagePrefix": "第 {{page}} 页 · ",
+      "chunkLabel": "片段 {{index}}",
+      "snippetFallback": "点击查看该片段"
+    }
+  },
+  "ragFiles": {
+    "title": "文件",
+    "fileFallback": "文件",
+    "fileList": "文件列表",
+    "fileCount": "{{count}} 个",
+    "chunkCount": "{{count}} 片段",
+    "relatedSnippet": "相关片段",
+    "pageLabel": "第 {{page}} 页",
+    "loadingListFailed": "文件列表加载失败",
+    "loadingFileFailed": "文件加载失败",
+    "previewLoadFailed": "PDF 预览加载失败",
+    "processingFailed": "文件处理失败",
+    "previewLoading": "预览加载中",
+    "previewNotReady": "PDF 预览尚未生成",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "zoomOut": "缩小",
+    "zoomIn": "放大",
+    "resetZoom": "重置缩放",
+    "pdfParsing": "PDF 解析中",
+    "rendering": "渲染中",
+    "pageRenderFailed": "页面渲染失败",
+    "pageUnavailable": "页面暂不可用",
+    "previewPageLabel": "{{name}} 第 {{page}} 页",
+    "empty": "暂无文件"
+  },
+  "admin": {
+    "title": "Admin 管理中心",
+    "subtitle": "数据、用户、对话、模型、联网搜索、OCR 和 RAG 配置",
+    "accessDeniedTitle": "无权访问",
+    "accessDeniedMessage": "当前账号没有管理员权限。",
+    "tabs": {
+      "dashboard": "数据看板",
+      "users": "用户设置",
+      "conversations": "对话管理",
+      "model": "模型配置",
+      "webSearch": "联网搜索",
+      "ocr": "百度 OCR",
+      "rag": "RAG 知识库"
+    },
+    "userTypes": {
+      "student": "学生",
+      "teacher": "老师",
+      "maintenance": "维护",
+      "admin": "管理员"
+    },
+    "ragStatuses": {
+      "failed": "处理失败",
+      "pending": "待处理",
+      "extracting": "提取中",
+      "ocr": "OCR 识别中",
+      "rendering": "生成预览",
+      "indexing": "入库中",
+      "indexed": "已入库",
+      "waiting": "待生成"
+    },
+    "messages": {
+      "passwordRequired": "新建用户需要填写密码",
+      "userCreated": "用户已创建",
+      "userUpdated": "用户已更新",
+      "deleteConversationConfirm": "确定删除对话“{{title}}”？",
+      "modelSaved": "模型配置已保存",
+      "webSearchSaved": "联网搜索配置已保存",
+      "paddleOcrSaved": "百度 PaddleOCR 配置已保存",
+      "selectRagFile": "请选择要上传的知识库文件",
+      "ragUploaded": "知识库文件已上传，正在后台生成",
+      "ragRebuildStarted": "RAG 向量数据库已开始后台重建",
+      "deleteRagFileConfirm": "确定删除知识库文件“{{name}}”？",
+      "ragFileDeleted": "知识库文件已删除"
+    },
+    "dashboard": {
+      "totalUsers": "用户总数",
+      "activeUsers": "启用用户",
+      "totalConversations": "对话总数",
+      "totalMessages": "消息总数",
+      "userTypes": "用户类型",
+      "currentModel": "当前模型"
+    },
+    "fields": {
+      "provider": "供应商",
+      "model": "模型",
+      "endpoint": "接口",
+      "status": "状态",
+      "updatedAt": "更新时间",
+      "apiKey": "API Key",
+      "username": "用户名",
+      "displayName": "显示名称",
+      "email": "邮箱",
+      "password": "密码",
+      "userType": "用户类型",
+      "user": "用户",
+      "actions": "操作",
+      "type": "类型",
+      "lastLogin": "最后登录",
+      "conversation": "对话",
+      "owner": "所有者",
+      "sharing": "共享",
+      "messages": "消息数",
+      "file": "文件",
+      "size": "大小",
+      "chunks": "分片",
+      "collection": "Collection",
+      "dataPath": "文件目录",
+      "persistDirectory": "数据库目录",
+      "fileTypes": "文件类型"
+    },
+    "users": {
+      "newUser": "新增用户",
+      "editUser": "编辑用户",
+      "cancelEdit": "取消编辑",
+      "passwordUnchanged": "留空则不修改",
+      "enableAccount": "启用账号",
+      "createUser": "创建用户",
+      "saveUser": "保存用户",
+      "list": "用户列表",
+      "search": "搜索用户",
+      "edit": "编辑"
+    },
+    "conversations": {
+      "list": "对话列表",
+      "search": "搜索标题或用户",
+      "visible": "可见",
+      "hidden": "已隐藏",
+      "hide": "隐藏",
+      "restore": "恢复"
+    },
+    "model": {
+      "title": "模型配置",
+      "provider": "模型供应商",
+      "name": "模型名称",
+      "available": "可用：{{models}}",
+      "apiKeyPlaceholder": "请输入 API Key"
+    },
+    "config": {
+      "save": "保存配置",
+      "current": "当前生效"
+    },
+    "webSearch": {
+      "title": "联网搜索",
+      "apiKeyPlaceholder": "请输入 Tavily API Key",
+      "enable": "启用联网搜索"
+    },
+    "ocr": {
+      "title": "百度 PaddleOCR",
+      "description": "用于 PNG、JPG、JPEG 和图片型 PDF 的异步识别。这里填写的是百度 AI Studio 访问令牌（Access Token），界面按 API Key 管理。",
+      "apiKey": "百度 API Key / Access Token",
+      "apiKeyPlaceholder": "请输入 AI Studio Access Token"
+    },
+    "rag": {
+      "totalFiles": "知识文件",
+      "indexedFiles": "已入库文件",
+      "vectorCount": "向量数量",
+      "knowledgeFiles": "知识文件",
+      "upload": "上传",
+      "empty": "暂无知识文件",
+      "vectorDatabase": "向量库",
+      "rebuild": "生成数据库"
+    }
+  }
 }

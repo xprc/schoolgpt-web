@@ -1,5 +1,6 @@
 import 'katex/dist/katex.min.css';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
@@ -33,8 +34,8 @@ const normalizeUrl = (value: string | undefined): string => {
     return String(value || '').trim();
 };
 
-const sourceLabel = (source: SearchSource): string => {
-    return source.host || source.title || `来源 ${source.index}`;
+const sourceLabel = (source: SearchSource, fallback: string): string => {
+    return source.host || source.title || fallback;
 };
 
 const findCitationSource = (
@@ -57,12 +58,14 @@ const findCitationSource = (
 
 type MarkdownLinkProps = ComponentPropsWithoutRef<'a'> & {
     citationSources: SearchSource[];
+    sourceFallbackLabel: (source: SearchSource) => string;
 };
 
 const MarkdownLink = ({
     href,
     children,
     citationSources,
+    sourceFallbackLabel,
     ...props
 }: MarkdownLinkProps) => {
     const isExternal = typeof href === 'string' && /^https?:\/\//i.test(href);
@@ -83,7 +86,7 @@ const MarkdownLink = ({
                     {citationSource.index}
                 </span>
                 <span className="markdown-citation-label">
-                    {sourceLabel(citationSource)}
+                    {sourceLabel(citationSource, sourceFallbackLabel(citationSource))}
                 </span>
             </a>
         );
@@ -105,11 +108,18 @@ export default function MarkdownContent({
     content,
     citationSources = [],
 }: MarkdownContentProps) {
+    const { t } = useTranslation();
+
     return (
         <ReactMarkdown
             components={{
                 a: (props) => (
-                    <MarkdownLink {...props} citationSources={citationSources} />
+                    <MarkdownLink
+                        {...props}
+                        citationSources={citationSources}
+                        sourceFallbackLabel={(source) =>
+                            t('sources.fallback', { index: source.index })}
+                    />
                 ),
                 code: CodeBlock,
             }}

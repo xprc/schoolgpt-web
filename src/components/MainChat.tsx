@@ -150,8 +150,6 @@ const groupRagSources = (sources: RagSource[]): RagSourceGroup[] => {
         .sort((a, b) => b.confidence - a.confidence);
 };
 
-const padTimePart = (value: number): string => value.toString().padStart(2, '0');
-
 const formatAiMessageTime = (value: string | undefined, language: string): string => {
     if (!value) {
         return '';
@@ -163,7 +161,13 @@ const formatAiMessageTime = (value: string | undefined, language: string): strin
     }
 
     if (language.startsWith('zh')) {
-        return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}`;
+        return new Intl.DateTimeFormat('zh-CN', {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(date);
     }
 
     return new Intl.DateTimeFormat('en-US', {
@@ -418,7 +422,7 @@ export default function MainChat({
                 m.id === responseId
                     ? {
                         ...m,
-                        content: m.content + ` \n\n**[请求出错: ${message}]**`,
+                        content: `${m.content} \n\n**[${t('chatDetails.requestError', { message })}]**`,
                     }
                     : m
             );
@@ -573,7 +577,7 @@ export default function MainChat({
                                             <div className="rounded-3xl bg-white/50 dark:bg-white/[0.06] border border-white/50 dark:border-white/10 backdrop-blur-xl px-5 pt-4 pb-2.5 shadow-lg shadow-black/5 dark:shadow-black/25 space-y-3 overflow-hidden">
                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                                                     <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-[#5b6ef5] dark:text-blue-400">
-                                                        校园百事通 <ArrowDown01Icon size={14} />
+                                                        {t('appName')} <ArrowDown01Icon size={14} />
                                                     </span>
                                                     {formatAiMessageTime(msg.createdAt, i18n.language) && (
                                                         <span className="font-medium text-gray-500 dark:text-gray-400">
@@ -652,10 +656,13 @@ export default function MainChat({
                                                         <div className="border-t border-gray-200/70 pt-3 dark:border-white/10">
                                                             <div className="mb-2 flex items-center justify-between gap-3">
                                                                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                                    RAG 来源
+                                                                    {t('chatDetails.rag.title')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400 dark:text-gray-500">
-                                                                    {groupRagSources(msg.ragSources ?? []).length} 个文件 · {(msg.ragSources ?? []).length} 个片段
+                                                                    {t('chatDetails.rag.summary', {
+                                                                        files: groupRagSources(msg.ragSources ?? []).length,
+                                                                        chunks: (msg.ragSources ?? []).length,
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                             <div className="grid gap-2">
@@ -669,7 +676,9 @@ export default function MainChat({
                                                                             onClick={() => onOpenRagSource(sourceGroup.primarySource)}
                                                                             disabled={typeof sourceGroup.primarySource.fileId !== 'number'}
                                                                             className="flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-white/10"
-                                                                            title={typeof sourceGroup.primarySource.fileId === 'number' ? sourceGroup.primarySource.snippet || sourceGroup.fileName : '旧来源不可打开'}
+                                                                            title={typeof sourceGroup.primarySource.fileId === 'number'
+                                                                                ? sourceGroup.primarySource.snippet || sourceGroup.fileName
+                                                                                : t('chatDetails.rag.legacyUnavailable')}
                                                                         >
                                                                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#5b6ef5] dark:bg-blue-400/10 dark:text-blue-200">
                                                                                 {renderFileTypeIcon(sourceGroup.fileName, {
@@ -681,7 +690,7 @@ export default function MainChat({
                                                                                     {sourceGroup.fileName}
                                                                                 </span>
                                                                                 <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                                                                                    {sourceGroup.count} 个相关片段
+                                                                                    {t('chatDetails.rag.fileSnippetCount', { count: sourceGroup.count })}
                                                                                 </span>
                                                                             </span>
                                                                             <span className="shrink-0 rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-semibold text-[#4a5ce0] dark:bg-blue-400/10 dark:text-blue-200">
@@ -697,21 +706,27 @@ export default function MainChat({
                                                                                         onClick={() => onOpenRagSource(source)}
                                                                                         disabled={typeof source.fileId !== 'number'}
                                                                                         className="min-w-0 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-white/10"
-                                                                                        title={typeof source.fileId === 'number' ? source.snippet || source.fileName : '旧来源不可打开'}
+                                                                                        title={typeof source.fileId === 'number'
+                                                                                            ? source.snippet || source.fileName
+                                                                                            : t('chatDetails.rag.legacyUnavailable')}
                                                                                     >
                                                                                         <span className="mb-1 flex items-center justify-between gap-2">
                                                                                             <span className="truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                                                                 {typeof source.pageNumber === 'number'
-                                                                                                    ? `第 ${source.pageNumber} 页 · `
+                                                                                                    ? t('chatDetails.rag.pagePrefix', { page: source.pageNumber })
                                                                                                     : ''}
-                                                                                                片段 {typeof source.chunkIndex === 'number' ? source.chunkIndex + 1 : sourceIndex + 1}
+                                                                                                {t('chatDetails.rag.chunkLabel', {
+                                                                                                    index: typeof source.chunkIndex === 'number'
+                                                                                                        ? source.chunkIndex + 1
+                                                                                                        : sourceIndex + 1,
+                                                                                                })}
                                                                                             </span>
                                                                                             <span className="shrink-0 text-xs font-semibold text-[#5b6ef5] dark:text-blue-300">
                                                                                                 {formatConfidence(source.confidence)}
                                                                                             </span>
                                                                                         </span>
                                                                                         <span className="line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                                                                                            {source.snippet || '点击查看该片段'}
+                                                                                            {source.snippet || t('chatDetails.rag.snippetFallback')}
                                                                                         </span>
                                                                                     </button>
                                                                                 ))}
@@ -738,7 +753,7 @@ export default function MainChat({
                                                                             ? 'text-[#5b6ef5] bg-white/60 dark:bg-white/10'
                                                                             : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10'
                                                                     }`}
-                                                                    title="Speak"
+                                                                    title={t('speak')}
                                                                 >
                                                                     {speakingId === msg.id ? (
                                                                         <VolumeMute01Icon size={16} />
@@ -749,7 +764,7 @@ export default function MainChat({
                                                                 <button
                                                                     onClick={() => copyText(msg.content)}
                                                                     className="flex h-8 w-8 items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors"
-                                                                    title="Copy"
+                                                                    title={t('copy')}
                                                                 >
                                                                     <Copy01Icon size={16} />
                                                                 </button>

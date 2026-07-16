@@ -11,6 +11,7 @@ import {
     type UserType,
 } from '../utils/authSession';
 import { DARK_BG, LIGHT_BG, normalizeBackground } from '../utils/backgrounds';
+import i18n from '../utils/i18n';
 
 type UserProfileResponse = {
     id: number;
@@ -63,10 +64,10 @@ const readErrorMessage = async (response: Response): Promise<string> => {
             return payload.detail;
         }
     } catch {
-        return '登录失败，请稍后重试';
+        return i18n.t('errors.loginFailed');
     }
 
-    return '登录失败，请稍后重试';
+    return i18n.t('errors.loginFailed');
 };
 
 export const login = async (identifier: string, password: string): Promise<AuthSession> => {
@@ -103,7 +104,7 @@ export const updateCurrentUserPreferences = async (
 ): Promise<AuthSession> => {
     const session = getStoredSession();
     if (!session) {
-        throw new AuthSessionError('请先登录');
+        throw new AuthSessionError(i18n.t('errors.authRequired'));
     }
 
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -120,7 +121,7 @@ export const updateCurrentUserPreferences = async (
     });
 
     if (response.status === 401) {
-        throw new AuthSessionError('登录已过期，请重新登录');
+        throw new AuthSessionError(i18n.t('errors.sessionExpired'));
     }
 
     if (!response.ok) {

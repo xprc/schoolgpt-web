@@ -27,11 +27,15 @@ type RoutePageFrameProps = {
     children: (context: RoutePageFrameContext) => ReactNode;
 };
 
-const PageLoadingFallback = () => (
-    <div className="relative z-10 flex min-h-screen w-full items-center justify-center text-sm text-white/75">
-        正在加载页面
-    </div>
-);
+const PageLoadingFallback = () => {
+    const { t } = useTranslation();
+
+    return (
+        <div className="relative z-10 flex min-h-screen w-full items-center justify-center text-sm text-white/75">
+            {t('loadingPage')}
+        </div>
+    );
+};
 
 export default function RoutePageFrame({ children }: RoutePageFrameProps) {
     const { t, i18n } = useTranslation();
@@ -119,7 +123,7 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
             >
                 <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"></div>
                 <div className="relative z-10 rounded-lg border border-white/25 bg-black/30 px-5 py-4 text-sm shadow-2xl backdrop-blur-xl">
-                    {setupError ?? '正在检查首次运行状态'}
+                    {setupError ?? t('checkingSetup')}
                 </div>
             </div>
         );
@@ -168,12 +172,12 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
                     type="button"
                     onClick={() => navigate('/')}
                     className="flex shrink-0 items-center gap-2 rounded-full px-2 py-1 text-lg font-medium text-white transition-colors hover:bg-white/10 sm:gap-3 sm:text-xl"
-                    title="返回首页"
+                    title={t('backHome')}
                 >
                     <span className="hidden h-8 w-8 items-center justify-center rounded-sm sm:flex">
                         <img src="/favicon.ico" alt="" />
                     </span>
-                    <span className="hidden sm:inline">校园百事通</span>
+                    <span className="hidden sm:inline">{t('appName')}</span>
                 </button>
 
                 <div className="flex-1"></div>
@@ -199,7 +203,7 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
                         <button
                             type="button"
                             onClick={() => navigate('/admin')}
-                            title="Admin 管理中心"
+                            title={t('admin.title')}
                             className="hidden rounded-full p-2 text-white transition-colors hover:bg-white/10 sm:block"
                         >
                             <GridIcon size={20} />
@@ -213,7 +217,7 @@ export default function RoutePageFrame({ children }: RoutePageFrameProps) {
                     >
                         <img
                             src={avatarUrl}
-                            alt="Profile"
+                            alt={t('profile')}
                             className="h-7 w-7 rounded-full border border-white/20 object-cover transition-transform hover:scale-105 sm:h-8 sm:w-8"
                         />
                     </button>

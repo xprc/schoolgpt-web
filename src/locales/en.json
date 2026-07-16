@@ -67,5 +67,238 @@
   "renameConversation": "Rename",
   "renameInputPlaceholder": "Conversation name",
   "deleteConversation": "Delete",
-  "deleteConversationConfirm": "Delete \"{{title}}\"?"
+  "deleteConversationConfirm": "Delete \"{{title}}\"?",
+  "appName": "SchoolGPT",
+  "loading": "Loading",
+  "loadingPage": "Loading page...",
+  "checkingSetup": "Checking first-run status...",
+  "close": "Close",
+  "refresh": "Refresh",
+  "backHome": "Back home",
+  "profile": "Profile",
+  "copy": "Copy",
+  "speak": "Speak",
+  "backgroundPreview": "Background preview",
+  "notConfigured": "Not configured",
+  "configured": "Configured",
+  "enabled": "Enabled",
+  "disabled": "Disabled",
+  "savedApiKey": "Saved {{mask}}",
+  "errors": {
+    "requestFailed": "Request failed, please try again later",
+    "loginFailed": "Login failed, please try again later",
+    "authRequired": "Please sign in first",
+    "sessionExpired": "Session expired. Please sign in again.",
+    "networkFailed": "Network request failed",
+    "streamUnavailable": "Unable to read the response stream",
+    "memoryRequestFailed": "Request failed",
+    "setupFailed": "Initialization failed, please try again later"
+  },
+  "setup": {
+    "title": "First-run setup",
+    "subtitle": "Fill in the database connection and admin account to get started",
+    "database": "Database",
+    "host": "Host",
+    "port": "Port",
+    "databaseName": "Database name",
+    "username": "Username",
+    "password": "Password",
+    "admin": "Admin",
+    "displayName": "Display name",
+    "email": "Email",
+    "submit": "Initialize",
+    "defaultAdminName": "SchoolGPT Admin"
+  },
+  "settingsPage": {
+    "memories": {
+      "title": "Memories",
+      "search": "Search memories",
+      "draft": "Write a long-term memory",
+      "editing": "Editing",
+      "count": "{{count}} memories",
+      "cancel": "Cancel",
+      "saving": "Saving",
+      "add": "Add",
+      "loading": "Loading",
+      "empty": "No memories yet",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this memory?"
+    }
+  },
+  "sources": {
+    "heading": "Search sources",
+    "fallback": "Source {{index}}"
+  },
+  "chatDetails": {
+    "requestError": "Request failed: {{message}}",
+    "rag": {
+      "title": "RAG sources",
+      "summary": "{{files}} files · {{chunks}} chunks",
+      "legacyUnavailable": "Legacy source cannot be opened",
+      "fileSnippetCount": "{{count}} related snippets",
+      "pagePrefix": "Page {{page}} · ",
+      "chunkLabel": "Chunk {{index}}",
+      "snippetFallback": "Click to view this snippet"
+    }
+  },
+  "ragFiles": {
+    "title": "Files",
+    "fileFallback": "File",
+    "fileList": "File list",
+    "fileCount": "{{count}} files",
+    "chunkCount": "{{count}} chunks",
+    "relatedSnippet": "Related snippet",
+    "pageLabel": "Page {{page}}",
+    "loadingListFailed": "Failed to load file list",
+    "loadingFileFailed": "Failed to load file",
+    "previewLoadFailed": "Failed to load PDF preview",
+    "processingFailed": "File processing failed",
+    "previewLoading": "Loading preview",
+    "previewNotReady": "PDF preview is not ready yet",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "resetZoom": "Reset zoom",
+    "pdfParsing": "Parsing PDF",
+    "rendering": "Rendering",
+    "pageRenderFailed": "Page rendering failed",
+    "pageUnavailable": "Page unavailable",
+    "previewPageLabel": "{{name}} page {{page}}",
+    "empty": "No files yet"
+  },
+  "admin": {
+    "title": "Admin Center",
+    "subtitle": "Data, users, conversations, model, web search, OCR, and RAG configuration",
+    "accessDeniedTitle": "Access denied",
+    "accessDeniedMessage": "The current account does not have administrator permissions.",
+    "tabs": {
+      "dashboard": "Dashboard",
+      "users": "Users",
+      "conversations": "Conversations",
+      "model": "Model",
+      "webSearch": "Web search",
+      "ocr": "Baidu OCR",
+      "rag": "RAG knowledge base"
+    },
+    "userTypes": {
+      "student": "Student",
+      "teacher": "Teacher",
+      "maintenance": "Maintenance",
+      "admin": "Admin"
+    },
+    "ragStatuses": {
+      "failed": "Failed",
+      "pending": "Pending",
+      "extracting": "Extracting",
+      "ocr": "Recognizing with OCR",
+      "rendering": "Generating preview",
+      "indexing": "Indexing",
+      "indexed": "Indexed",
+      "waiting": "Waiting"
+    },
+    "messages": {
+      "passwordRequired": "A password is required for new users",
+      "userCreated": "User created",
+      "userUpdated": "User updated",
+      "deleteConversationConfirm": "Delete conversation \"{{title}}\"?",
+      "modelSaved": "Model configuration saved",
+      "webSearchSaved": "Web search configuration saved",
+      "paddleOcrSaved": "Baidu PaddleOCR configuration saved",
+      "selectRagFile": "Choose knowledge base files to upload",
+      "ragUploaded": "Knowledge base files uploaded; indexing is running in the background",
+      "ragRebuildStarted": "RAG vector database rebuild started in the background",
+      "deleteRagFileConfirm": "Delete knowledge base file \"{{name}}\"?",
+      "ragFileDeleted": "Knowledge base file deleted"
+    },
+    "dashboard": {
+      "totalUsers": "Total users",
+      "activeUsers": "Active users",
+      "totalConversations": "Total conversations",
+      "totalMessages": "Total messages",
+      "userTypes": "User types",
+      "currentModel": "Current model"
+    },
+    "fields": {
+      "provider": "Provider",
+      "model": "Model",
+      "endpoint": "Endpoint",
+      "status": "Status",
+      "updatedAt": "Updated",
+      "apiKey": "API Key",
+      "username": "Username",
+      "displayName": "Display name",
+      "email": "Email",
+      "password": "Password",
+      "userType": "User type",
+      "user": "User",
+      "actions": "Actions",
+      "type": "Type",
+      "lastLogin": "Last login",
+      "conversation": "Conversation",
+      "owner": "Owner",
+      "sharing": "Sharing",
+      "messages": "Messages",
+      "file": "File",
+      "size": "Size",
+      "chunks": "Chunks",
+      "collection": "Collection",
+      "dataPath": "File directory",
+      "persistDirectory": "Database directory",
+      "fileTypes": "File types"
+    },
+    "users": {
+      "newUser": "New user",
+      "editUser": "Edit user",
+      "cancelEdit": "Cancel editing",
+      "passwordUnchanged": "Leave blank to keep unchanged",
+      "enableAccount": "Enable account",
+      "createUser": "Create user",
+      "saveUser": "Save user",
+      "list": "User list",
+      "search": "Search users",
+      "edit": "Edit"
+    },
+    "conversations": {
+      "list": "Conversation list",
+      "search": "Search title or user",
+      "visible": "Visible",
+      "hidden": "Hidden",
+      "hide": "Hide",
+      "restore": "Restore"
+    },
+    "model": {
+      "title": "Model configuration",
+      "provider": "Model provider",
+      "name": "Model name",
+      "available": "Available: {{models}}",
+      "apiKeyPlaceholder": "Enter API Key"
+    },
+    "config": {
+      "save": "Save configuration",
+      "current": "Current configuration"
+    },
+    "webSearch": {
+      "title": "Web search",
+      "apiKeyPlaceholder": "Enter Tavily API Key",
+      "enable": "Enable web search"
+    },
+    "ocr": {
+      "title": "Baidu PaddleOCR",
+      "description": "Used for asynchronous recognition of PNG, JPG, JPEG, and image-based PDFs. Enter the Baidu AI Studio access token here; the UI manages it as an API Key.",
+      "apiKey": "Baidu API Key / Access Token",
+      "apiKeyPlaceholder": "Enter AI Studio Access Token"
+    },
+    "rag": {
+      "totalFiles": "Knowledge files",
+      "indexedFiles": "Indexed files",
+      "vectorCount": "Vectors",
+      "knowledgeFiles": "Knowledge files",
+      "upload": "Upload",
+      "empty": "No knowledge files yet",
+      "vectorDatabase": "Vector database",
+      "rebuild": "Generate database"
+    }
+  }
 }

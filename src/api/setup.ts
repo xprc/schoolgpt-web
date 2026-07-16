@@ -1,4 +1,5 @@
 import { apiBaseUrl } from './config';
+import i18n from '../utils/i18n';
 
 export type FirstRunSetupPayload = {
     database: {
@@ -29,10 +30,10 @@ const readErrorMessage = async (response: Response): Promise<string> => {
             return payload.detail;
         }
     } catch {
-        return '初始化失败，请稍后重试';
+        return i18n.t('errors.setupFailed');
     }
 
-    return '初始化失败，请稍后重试';
+    return i18n.t('errors.setupFailed');
 };
 
 export const fetchSetupStatus = async (): Promise<boolean> => {

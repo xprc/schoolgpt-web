@@ -68,7 +68,7 @@ const parseSourceLine = (line: string): SearchSource | null => {
 
     return {
         index,
-        title: cleanMarkdownText(match[2]) || getHost(url) || `来源 ${index}`,
+        title: cleanMarkdownText(match[2]) || getHost(url),
         url,
         description: cleanDescription(match[5] || ''),
         host: getHost(url),

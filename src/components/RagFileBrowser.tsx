@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Document, Page, pdfjs } from 'react-pdf';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -97,6 +98,7 @@ export default function RagFileBrowser({
     onClose,
     onAuthExpired,
 }: RagFileBrowserProps) {
+    const { t } = useTranslation();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const pageRefs = useRef<Map<number, HTMLElement>>(new Map());
     const scrollFrameRef = useRef<number | null>(null);
@@ -169,7 +171,7 @@ export default function RagFileBrowser({
                     return;
                 }
 
-                setErrorMessage(error instanceof Error ? error.message : '文件列表加载失败');
+                setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingListFailed'));
             })
             .finally(() => {
                 if (!cancelled) {
@@ -180,7 +182,7 @@ export default function RagFileBrowser({
         return () => {
             cancelled = true;
         };
-    }, [isOpen, onAuthExpired, openRequest]);
+    }, [isOpen, onAuthExpired, openRequest, t]);
 
     useEffect(() => {
         if (!isOpen || selectedFileId === null) {
@@ -210,7 +212,7 @@ export default function RagFileBrowser({
                     return;
                 }
 
-                setErrorMessage(error instanceof Error ? error.message : '文件加载失败');
+                setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingFileFailed'));
             })
             .finally(() => {
                 if (!cancelled) {
@@ -221,7 +223,7 @@ export default function RagFileBrowser({
         return () => {
             cancelled = true;
         };
-    }, [isOpen, onAuthExpired, openRequest, selectedFileId]);
+    }, [isOpen, onAuthExpired, openRequest, selectedFileId, t]);
 
     const activeSnippet = useMemo(() => {
         if (!detail) {
@@ -299,7 +301,7 @@ export default function RagFileBrowser({
                     return;
                 }
 
-                setPreviewError(error instanceof Error ? error.message : 'PDF 预览加载失败');
+                setPreviewError(error instanceof Error ? error.message : t('ragFiles.previewLoadFailed'));
             })
             .finally(() => {
                 if (!cancelled) {
@@ -310,7 +312,7 @@ export default function RagFileBrowser({
         return () => {
             cancelled = true;
         };
-    }, [detailId, detailStatus, isOpen, onAuthExpired]);
+    }, [detailId, detailStatus, isOpen, onAuthExpired, t]);
 
     const pageNumbers = useMemo(() => {
         return Array.from({ length: pageCount }, (_, index) => index + 1);
@@ -420,10 +422,10 @@ export default function RagFileBrowser({
 
     const handleDocumentLoadError = (error: Error) => {
         setPageCount(0);
-        setPreviewError(error.message || 'PDF 预览加载失败');
+        setPreviewError(error.message || t('ragFiles.previewLoadFailed'));
     };
 
-    const renderPdfPageState = (message: string): ReactNode => (
+    const renderPdfPageState = (message: string, showSpinner = false): ReactNode => (
         <div
             className="flex items-center justify-center bg-white text-sm text-gray-500 dark:text-gray-500"
             style={{
@@ -431,7 +433,7 @@ export default function RagFileBrowser({
                 width: Math.round(DEFAULT_PAGE_WIDTH * zoom),
             }}
         >
-            {message === '渲染中' ? (
+            {showSpinner ? (
                 <span className="flex items-center gap-2">
                     <Refresh01Icon size={15} className="animate-spin" />
                     {message}
@@ -477,11 +479,11 @@ export default function RagFileBrowser({
     const fileListContent = loadingList ? (
         <div className="flex items-center gap-2 px-3 py-3 text-sm text-gray-500 dark:text-gray-300">
             <Refresh01Icon size={15} className="animate-spin" />
-            加载中
+            {t('loading')}
         </div>
     ) : files.length === 0 ? (
         <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-300">
-            暂无文件
+            {t('ragFiles.empty')}
         </div>
     ) : (
         files.map((file) => (
@@ -503,7 +505,7 @@ export default function RagFileBrowser({
                         {file.name}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
-                        {formatFileSize(file.size)} · {file.chunkCount} 片段
+                        {formatFileSize(file.size)} · {t('ragFiles.chunkCount', { count: file.chunkCount })}
                     </span>
                 </span>
             </button>
@@ -530,13 +532,13 @@ export default function RagFileBrowser({
                     <div className="flex h-14 items-center justify-between border-b border-gray-200 px-4 dark:border-white/10">
                         <div className="flex items-center gap-2 font-semibold text-gray-950 dark:text-white">
                             <File01Icon size={18} />
-                            文件
+                            {t('ragFiles.title')}
                         </div>
                         <button
                             type="button"
                             onClick={refreshFiles}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-black/5 dark:text-gray-300 dark:hover:bg-white/10"
-                            title="刷新"
+                            title={t('refresh')}
                         >
                             <Refresh01Icon size={16} />
                         </button>
@@ -550,7 +552,7 @@ export default function RagFileBrowser({
                     <header className="flex min-h-14 items-center gap-3 border-b border-gray-200 px-4 dark:border-white/10">
                         <div className="min-w-0 flex-1">
                             <div className="truncate font-semibold text-gray-950 dark:text-white">
-                                {detail?.name ?? '文件'}
+                                {detail?.name ?? t('ragFiles.fileFallback')}
                             </div>
                             {detail && (
                                 <div className="truncate text-xs text-gray-500 dark:text-gray-400">
@@ -562,7 +564,7 @@ export default function RagFileBrowser({
                             type="button"
                             onClick={onClose}
                             className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-black/5 dark:text-gray-300 dark:hover:bg-white/10"
-                            title="关闭"
+                            title={t('close')}
                         >
                             <Cancel01Icon size={18} />
                         </button>
@@ -579,11 +581,11 @@ export default function RagFileBrowser({
                                 <span className="flex min-w-0 items-center gap-2">
                                     <File01Icon size={17} className="shrink-0" />
                                     <span className="truncate text-sm font-medium">
-                                        文件列表
+                                        {t('ragFiles.fileList')}
                                     </span>
                                 </span>
                                 <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                    {files.length} 个
+                                    {t('ragFiles.fileCount', { count: files.length })}
                                     {isMobileFileListOpen ? (
                                         <ArrowUp01Icon size={16} />
                                     ) : (
@@ -595,8 +597,8 @@ export default function RagFileBrowser({
                                 type="button"
                                 onClick={refreshFiles}
                                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-white/70 dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                                title="刷新"
-                                aria-label="刷新文件列表"
+                                title={t('refresh')}
+                                aria-label={t('refresh')}
                             >
                                 <Refresh01Icon size={16} />
                             </button>
@@ -618,10 +620,10 @@ export default function RagFileBrowser({
                         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
                             <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-200">
                                 <Search01Icon size={14} />
-                                相关片段
+                                {t('ragFiles.relatedSnippet')}
                                 {targetPageNumber && (
                                     <span className="font-sans font-medium normal-case">
-                                        第 {targetPageNumber} 页
+                                        {t('ragFiles.pageLabel', { page: targetPageNumber })}
                                     </span>
                                 )}
                             </div>
@@ -633,16 +635,16 @@ export default function RagFileBrowser({
                         {loadingDetail ? (
                             <div className="flex h-full items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-300">
                                 <Refresh01Icon size={15} className="animate-spin" />
-                                加载中
+                                {t('loading')}
                             </div>
                         ) : detail?.status === 'failed' ? (
                             <div className="m-5 rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
-                                {detail.errorMessage || '文件处理失败'}
+                                {detail.errorMessage || t('ragFiles.processingFailed')}
                             </div>
                         ) : loadingPreview ? (
                             <div className="flex h-full items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-300">
                                 <Refresh01Icon size={15} className="animate-spin" />
-                                预览加载中
+                                {t('ragFiles.previewLoading')}
                             </div>
                         ) : previewError ? (
                             <div className="m-5 rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
@@ -650,7 +652,7 @@ export default function RagFileBrowser({
                             </div>
                         ) : !pdfFile ? (
                             <div className="flex h-full items-center justify-center font-sans text-sm text-gray-500 dark:text-gray-300">
-                                PDF 预览尚未生成
+                                {t('ragFiles.previewNotReady')}
                             </div>
                         ) : (
                             <div className="flex h-full min-h-0 flex-col">
@@ -661,21 +663,21 @@ export default function RagFileBrowser({
                                             onClick={goToPreviousPage}
                                             disabled={pageCount <= 0 || pageNumber <= 1}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
-                                            aria-label="上一页"
-                                            title="上一页"
+                                            aria-label={t('ragFiles.previousPage')}
+                                            title={t('ragFiles.previousPage')}
                                         >
                                             <ArrowLeft01Icon size={16} />
                                         </button>
                                         <div className="min-w-24 text-center text-sm text-gray-700 dark:text-gray-200">
-                                            {pageCount > 0 ? `${pageNumber} / ${pageCount}` : '加载中'}
+                                            {pageCount > 0 ? `${pageNumber} / ${pageCount}` : t('loading')}
                                         </div>
                                         <button
                                             type="button"
                                             onClick={goToNextPage}
                                             disabled={pageCount <= 0 || pageNumber >= pageCount}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
-                                            aria-label="下一页"
-                                            title="下一页"
+                                            aria-label={t('ragFiles.nextPage')}
+                                            title={t('ragFiles.nextPage')}
                                         >
                                             <ArrowRight01Icon size={16} />
                                         </button>
@@ -686,8 +688,8 @@ export default function RagFileBrowser({
                                             onClick={zoomOut}
                                             disabled={zoom <= MIN_ZOOM}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
-                                            aria-label="缩小"
-                                            title="缩小"
+                                            aria-label={t('ragFiles.zoomOut')}
+                                            title={t('ragFiles.zoomOut')}
                                         >
                                             <ZoomOutAreaIcon size={16} />
                                         </button>
@@ -695,7 +697,7 @@ export default function RagFileBrowser({
                                             type="button"
                                             onClick={resetZoom}
                                             className="h-8 min-w-14 rounded-lg px-2 text-sm text-gray-700 hover:bg-black/5 dark:text-gray-200 dark:hover:bg-white/10"
-                                            title="重置缩放"
+                                            title={t('ragFiles.resetZoom')}
                                         >
                                             {Math.round(zoom * 100)}%
                                         </button>
@@ -704,8 +706,8 @@ export default function RagFileBrowser({
                                             onClick={zoomIn}
                                             disabled={zoom >= MAX_ZOOM}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-700 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
-                                            aria-label="放大"
-                                            title="放大"
+                                            aria-label={t('ragFiles.zoomIn')}
+                                            title={t('ragFiles.zoomIn')}
                                         >
                                             <ZoomInAreaIcon size={16} />
                                         </button>
@@ -724,17 +726,17 @@ export default function RagFileBrowser({
                                         loading={(
                                             <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-300">
                                                 <Refresh01Icon size={15} className="animate-spin" />
-                                                PDF 解析中
+                                                {t('ragFiles.pdfParsing')}
                                             </div>
                                         )}
                                         error={(
                                             <div className="rounded-lg border border-red-100 bg-red-50 p-4 font-sans text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
-                                                PDF 预览加载失败
+                                                {t('ragFiles.previewLoadFailed')}
                                             </div>
                                         )}
                                         noData={(
                                             <div className="flex min-h-64 items-center justify-center text-sm text-gray-500 dark:text-gray-300">
-                                                PDF 预览尚未生成
+                                                {t('ragFiles.previewNotReady')}
                                             </div>
                                         )}
                                     >
@@ -752,16 +754,21 @@ export default function RagFileBrowser({
                                                             : 'text-gray-500 dark:text-gray-400'
                                                     }`}
                                                 >
-                                                    第 {currentPageNumber} 页
+                                                    {t('ragFiles.pageLabel', { page: currentPageNumber })}
                                                 </div>
-                                                <div aria-label={`${detail?.name ?? '文件预览'} 第 ${currentPageNumber} 页`}>
+                                                <div
+                                                    aria-label={t('ragFiles.previewPageLabel', {
+                                                        name: detail?.name ?? t('ragFiles.fileFallback'),
+                                                        page: currentPageNumber,
+                                                    })}
+                                                >
                                                     <Page
                                                         pageNumber={currentPageNumber}
                                                         scale={PDF_BASE_SCALE * zoom}
                                                         className="overflow-hidden rounded-sm bg-white shadow [&_canvas]:!block [&_canvas]:!max-w-none"
-                                                        loading={renderPdfPageState('渲染中')}
-                                                        error={renderPdfPageState('页面渲染失败')}
-                                                        noData={renderPdfPageState('页面暂不可用')}
+                                                        loading={renderPdfPageState(t('ragFiles.rendering'), true)}
+                                                        error={renderPdfPageState(t('ragFiles.pageRenderFailed'))}
+                                                        noData={renderPdfPageState(t('ragFiles.pageUnavailable'))}
                                                     />
                                                 </div>
                                             </section>

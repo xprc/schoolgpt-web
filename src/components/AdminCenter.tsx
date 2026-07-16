@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import '@material/web/button/filled-button.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/progress/circular-progress.js';
@@ -100,22 +101,7 @@ const emptyUserDraft: AdminUserDraft = {
     isActive: true,
 };
 
-const userTypeLabels: Record<UserType, string> = {
-    student: '学生',
-    teacher: '老师',
-    maintenance: '维护',
-    admin: '管理员',
-};
-
-const tabs: Array<{ key: AdminTab; label: string; icon: typeof GridIcon }> = [
-    { key: 'dashboard', label: '数据看板', icon: GridIcon },
-    { key: 'users', label: '用户设置', icon: Edit01Icon },
-    { key: 'conversations', label: '对话管理', icon: Chat01Icon },
-    { key: 'model', label: '模型配置', icon: BotIcon },
-    { key: 'web-search', label: '联网搜索', icon: Search01Icon },
-    { key: 'ocr', label: '百度 OCR', icon: BotIcon },
-    { key: 'rag', label: 'RAG 知识库', icon: Search01Icon },
-];
+type AdminTabDefinition = { key: AdminTab; label: string; icon: typeof GridIcon };
 
 const activeRagFileStatuses = new Set(['pending', 'extracting', 'ocr', 'rendering', 'indexing']);
 
@@ -123,32 +109,32 @@ const isRagFileProcessing = (status: string): boolean => {
     return activeRagFileStatuses.has(status);
 };
 
-const ragFileStatusLabel = (status: string, indexed: boolean): string => {
+const ragFileStatusTranslationKey = (status: string, indexed: boolean): string => {
     if (status === 'failed') {
-        return '处理失败';
+        return 'admin.ragStatuses.failed';
     }
 
     if (status === 'pending') {
-        return '待处理';
+        return 'admin.ragStatuses.pending';
     }
 
     if (status === 'extracting') {
-        return '提取中';
+        return 'admin.ragStatuses.extracting';
     }
 
     if (status === 'ocr') {
-        return 'OCR 识别中';
+        return 'admin.ragStatuses.ocr';
     }
 
     if (status === 'rendering') {
-        return '生成预览';
+        return 'admin.ragStatuses.rendering';
     }
 
     if (status === 'indexing') {
-        return '入库中';
+        return 'admin.ragStatuses.indexing';
     }
 
-    return indexed ? '已入库' : '待生成';
+    return indexed ? 'admin.ragStatuses.indexed' : 'admin.ragStatuses.waiting';
 };
 
 const ragFileStatusBadgeClass = (status: string, indexed: boolean): string => {
@@ -167,7 +153,7 @@ const ragFileStatusBadgeClass = (status: string, indexed: boolean): string => {
     return 'admin-md3__chip admin-md3__chip--warning';
 };
 
-const formatDate = (value: string | null): string => {
+const formatDate = (value: string | null, locale: string): string => {
     if (!value) {
         return '-';
     }
@@ -177,7 +163,7 @@ const formatDate = (value: string | null): string => {
         return value;
     }
 
-    return date.toLocaleString('zh-CN', {
+    return date.toLocaleString(locale, {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -186,8 +172,8 @@ const formatDate = (value: string | null): string => {
     });
 };
 
-const formatCount = (value: number): string => {
-    return new Intl.NumberFormat('zh-CN').format(value);
+const formatCount = (value: number, locale: string): string => {
+    return new Intl.NumberFormat(locale).format(value);
 };
 
 const formatFileSize = (value: number): string => {
@@ -233,6 +219,23 @@ const paddleOcrDraftFromConfig = (): { apiKey: string } => {
 };
 
 export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps) {
+    const { t, i18n } = useTranslation();
+    const currentLocale = i18n.language?.startsWith('zh') ? 'zh-CN' : 'en-US';
+    const userTypeLabels = useMemo<Record<UserType, string>>(() => ({
+        student: t('admin.userTypes.student'),
+        teacher: t('admin.userTypes.teacher'),
+        maintenance: t('admin.userTypes.maintenance'),
+        admin: t('admin.userTypes.admin'),
+    }), [t]);
+    const tabs = useMemo<AdminTabDefinition[]>(() => [
+        { key: 'dashboard', label: t('admin.tabs.dashboard'), icon: GridIcon },
+        { key: 'users', label: t('admin.tabs.users'), icon: Edit01Icon },
+        { key: 'conversations', label: t('admin.tabs.conversations'), icon: Chat01Icon },
+        { key: 'model', label: t('admin.tabs.model'), icon: BotIcon },
+        { key: 'web-search', label: t('admin.tabs.webSearch'), icon: Search01Icon },
+        { key: 'ocr', label: t('admin.tabs.ocr'), icon: BotIcon },
+        { key: 'rag', label: t('admin.tabs.rag'), icon: Search01Icon },
+    ], [t]);
     const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
     const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
@@ -364,7 +367,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 userTypeLabels[user.userType],
             ].some((value) => value.toLowerCase().includes(query));
         });
-    }, [userSearch, users]);
+    }, [userSearch, userTypeLabels, users]);
 
     const filteredConversations = useMemo(() => {
         const query = conversationSearch.trim().toLowerCase();
@@ -422,11 +425,11 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         try {
             if (editingUserId === null) {
                 if (!userDraft.password) {
-                    throw new Error('新建用户需要填写密码');
+                    throw new Error(t('admin.messages.passwordRequired'));
                 }
                 const createdUser = await createAdminUser(userDraft);
                 setUsers((prev) => [createdUser, ...prev]);
-                setStatusMessage('用户已创建');
+                setStatusMessage(t('admin.messages.userCreated'));
             } else {
                 const updatedUser = await updateAdminUser(editingUserId, userDraft);
                 if (userDraft.password) {
@@ -435,7 +438,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 setUsers((prev) =>
                     prev.map((user) => user.id === updatedUser.id ? updatedUser : user)
                 );
-                setStatusMessage('用户已更新');
+                setStatusMessage(t('admin.messages.userUpdated'));
             }
 
             resetUserForm();
@@ -472,7 +475,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     };
 
     const handleDeleteConversation = async (conversation: AdminConversation) => {
-        if (!window.confirm(`确定删除对话「${conversation.title}」？`)) {
+        if (!window.confirm(t('admin.messages.deleteConversationConfirm', { title: conversation.title }))) {
             return;
         }
 
@@ -517,7 +520,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             setModelDraft(modelDraftFromConfig(updatedConfig));
             const nextDashboard = await fetchAdminDashboard();
             setDashboard(nextDashboard);
-            setStatusMessage('模型配置已保存');
+            setStatusMessage(t('admin.messages.modelSaved'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -540,7 +543,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             });
             setWebSearchConfig(updatedConfig);
             setWebSearchDraft(webSearchDraftFromConfig(updatedConfig));
-            setStatusMessage('联网搜索配置已保存');
+            setStatusMessage(t('admin.messages.webSearchSaved'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -562,7 +565,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             });
             setPaddleOcrConfig(updatedConfig);
             setPaddleOcrDraft(paddleOcrDraftFromConfig());
-            setStatusMessage('百度 PaddleOCR 配置已保存');
+            setStatusMessage(t('admin.messages.paddleOcrSaved'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -576,7 +579,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
 
     const handleRagUpload = async () => {
         if (ragUploadFiles.length === 0) {
-            setErrorMessage('请选择要上传的知识库文件');
+            setErrorMessage(t('admin.messages.selectRagFile'));
             return;
         }
 
@@ -589,7 +592,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             setRagStatus(nextStatus);
             setRagUploadFiles([]);
             setRagFileInputKey((prev) => prev + 1);
-            setStatusMessage('知识库文件已上传，正在后台生成');
+            setStatusMessage(t('admin.messages.ragUploaded'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -605,7 +608,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         try {
             const nextStatus = await rebuildRagDatabase();
             setRagStatus(nextStatus);
-            setStatusMessage('RAG 向量数据库已开始后台重建');
+            setStatusMessage(t('admin.messages.ragRebuildStarted'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -614,7 +617,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     };
 
     const handleRagDelete = async (fileId: number, fileName: string) => {
-        if (!window.confirm(`确定删除知识库文件「${fileName}」？`)) {
+        if (!window.confirm(t('admin.messages.deleteRagFileConfirm', { name: fileName }))) {
             return;
         }
 
@@ -625,7 +628,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         try {
             const nextStatus = await deleteRagFile(fileId);
             setRagStatus(nextStatus);
-            setStatusMessage('知识库文件已删除');
+            setStatusMessage(t('admin.messages.ragFileDeleted'));
         } catch (error: unknown) {
             handleError(error);
         } finally {
@@ -639,10 +642,10 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         }
 
         const stats = [
-            { label: '用户总数', value: dashboard.totalUsers },
-            { label: '启用用户', value: dashboard.activeUsers },
-            { label: '对话总数', value: dashboard.totalConversations },
-            { label: '消息总数', value: dashboard.totalMessages },
+            { label: t('admin.dashboard.totalUsers'), value: dashboard.totalUsers },
+            { label: t('admin.dashboard.activeUsers'), value: dashboard.activeUsers },
+            { label: t('admin.dashboard.totalConversations'), value: dashboard.totalConversations },
+            { label: t('admin.dashboard.totalMessages'), value: dashboard.totalMessages },
         ];
 
         return (
@@ -657,7 +660,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                 {stat.label}
                             </div>
                             <div className="mt-2 text-3xl font-semibold">
-                                {formatCount(stat.value)}
+                                {formatCount(stat.value, currentLocale)}
                             </div>
                         </div>
                     ))}
@@ -666,7 +669,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 <div className="grid gap-4 xl:grid-cols-2">
                     <div className="admin-md3__pane p-5">
                         <h3 className="text-base font-semibold">
-                            用户类型
+                            {t('admin.dashboard.userTypes')}
                         </h3>
                         <div className="mt-4 space-y-3">
                             {Object.entries(userTypeLabels).map(([userType, label]) => (
@@ -692,17 +695,17 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
 
                     <div className="admin-md3__pane p-5">
                         <h3 className="text-base font-semibold">
-                            当前模型
+                            {t('admin.dashboard.currentModel')}
                         </h3>
                         <dl className="mt-4 grid gap-3 text-sm">
                             <div className="flex items-center justify-between gap-4">
-                                <dt className="admin-md3__muted">供应商</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.provider')}</dt>
                                 <dd className="font-medium">
                                     {dashboard.activeModel.providerLabel}
                                 </dd>
                             </div>
                             <div className="flex items-center justify-between gap-4">
-                                <dt className="admin-md3__muted">模型</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.model')}</dt>
                                 <dd className="font-medium">
                                     {dashboard.activeModel.modelName}
                                 </dd>
@@ -713,7 +716,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     ? 'font-medium text-emerald-600 dark:text-emerald-300'
                                     : 'font-medium text-[var(--md-sys-color-error)]'}
                                 >
-                                    {dashboard.activeModel.hasApiKey ? '已配置' : '未配置'}
+                                    {dashboard.activeModel.hasApiKey ? t('configured') : t('notConfigured')}
                                 </dd>
                             </div>
                         </dl>
@@ -732,13 +735,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 >
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-base font-semibold">
-                            {editingUserId === null ? '新增用户' : '编辑用户'}
+                            {editingUserId === null ? t('admin.users.newUser') : t('admin.users.editUser')}
                         </h3>
                         {editingUserId !== null && (
                             <md-icon-button
                                 type="button"
                                 onClick={resetUserForm}
-                                title="取消编辑"
+                                title={t('admin.users.cancelEdit')}
                             >
                                 <Cancel01Icon size={16} />
                             </md-icon-button>
@@ -748,7 +751,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     <div className="space-y-4">
                         <md-outlined-text-field
                             className="admin-md3__field"
-                            label="用户名"
+                            label={t('admin.fields.username')}
                             value={userDraft.username}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
@@ -760,7 +763,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         />
                         <md-outlined-text-field
                             className="admin-md3__field"
-                            label="显示名称"
+                            label={t('admin.fields.displayName')}
                             value={userDraft.displayName}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
@@ -773,7 +776,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <md-outlined-text-field
                             className="admin-md3__field"
                             type="email"
-                            label="邮箱"
+                            label={t('admin.fields.email')}
                             value={userDraft.email}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
@@ -786,8 +789,8 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <md-outlined-text-field
                             className="admin-md3__field"
                             type="password"
-                            label="密码"
-                            supportingText={editingUserId === null ? '' : '留空则不修改'}
+                            label={t('admin.fields.password')}
+                            supportingText={editingUserId === null ? '' : t('admin.users.passwordUnchanged')}
                             value={userDraft.password ?? ''}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
@@ -799,7 +802,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         />
                         <md-outlined-select
                             className="admin-md3__field"
-                            label="用户类型"
+                            label={t('admin.fields.userType')}
                             value={userDraft.userType}
                             menuPositioning="fixed"
                             onInput={(event) => {
@@ -831,7 +834,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     }));
                                 }}
                             />
-                            <span>启用账号</span>
+                            <span>{t('admin.users.enableAccount')}</span>
                         </label>
                     </div>
 
@@ -843,19 +846,19 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <span slot="icon" className="admin-md3__slot-icon">
                             {editingUserId === null ? <Add01Icon size={16} /> : <Tick02Icon size={16} />}
                         </span>
-                        {editingUserId === null ? '创建用户' : '保存用户'}
+                        {editingUserId === null ? t('admin.users.createUser') : t('admin.users.saveUser')}
                     </md-filled-button>
                 </form>
 
                 <div className="admin-md3__pane min-w-0 overflow-hidden">
                     <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 sm:flex-row sm:items-center sm:justify-between">
                         <h3 className="text-base font-semibold">
-                            用户列表
+                            {t('admin.users.list')}
                         </h3>
                         <md-outlined-text-field
                             className="admin-md3__field sm:max-w-xs"
                             type="search"
-                            label="搜索用户"
+                            label={t('admin.users.search')}
                             value={userSearch}
                             onInput={(event) => setUserSearch(getMaterialValue(event))}
                         >
@@ -868,11 +871,11 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <table className="admin-md3__table min-w-[760px]">
                             <thead>
                                 <tr>
-                                    <th>用户</th>
-                                    <th>类型</th>
-                                    <th>状态</th>
-                                    <th>最后登录</th>
-                                    <th className="text-right">操作</th>
+                                    <th>{t('admin.fields.user')}</th>
+                                    <th>{t('admin.fields.type')}</th>
+                                    <th>{t('admin.fields.status')}</th>
+                                    <th>{t('admin.fields.lastLogin')}</th>
+                                    <th className="text-right">{t('admin.fields.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -894,18 +897,18 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                 ? 'admin-md3__chip admin-md3__chip--success'
                                                 : 'admin-md3__chip admin-md3__chip--neutral'}
                                             >
-                                                {user.isActive ? '启用' : '停用'}
+                                                {user.isActive ? t('enabled') : t('disabled')}
                                             </span>
                                         </td>
                                         <td className="admin-md3__muted">
-                                            {formatDate(user.lastLoginAt)}
+                                            {formatDate(user.lastLoginAt, currentLocale)}
                                         </td>
                                         <td>
                                             <div className="flex justify-end">
                                                 <md-icon-button
                                                     type="button"
                                                     onClick={() => handleEditUser(user)}
-                                                    title="编辑"
+                                                    title={t('admin.users.edit')}
                                                 >
                                                     <Edit01Icon size={16} />
                                                 </md-icon-button>
@@ -926,12 +929,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="admin-md3__pane overflow-hidden">
                 <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="text-base font-semibold">
-                        对话列表
+                        {t('admin.conversations.list')}
                     </h3>
                     <md-outlined-text-field
                         className="admin-md3__field sm:max-w-xs"
                         type="search"
-                        label="搜索标题或用户"
+                        label={t('admin.conversations.search')}
                         value={conversationSearch}
                         onInput={(event) => setConversationSearch(getMaterialValue(event))}
                     >
@@ -944,13 +947,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     <table className="admin-md3__table min-w-[920px]">
                         <thead>
                             <tr>
-                                <th>对话</th>
-                                <th>所有者</th>
-                                <th>共享</th>
-                                <th>消息数</th>
-                                <th>更新时间</th>
-                                <th>状态</th>
-                                <th className="text-right">操作</th>
+                                <th>{t('admin.fields.conversation')}</th>
+                                <th>{t('admin.fields.owner')}</th>
+                                <th>{t('admin.fields.sharing')}</th>
+                                <th>{t('admin.fields.messages')}</th>
+                                <th>{t('admin.fields.updatedAt')}</th>
+                                <th>{t('admin.fields.status')}</th>
+                                <th className="text-right">{t('admin.fields.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -979,14 +982,16 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                         {conversation.messageCount}
                                     </td>
                                     <td className="admin-md3__muted">
-                                        {formatDate(conversation.updatedAt)}
+                                        {formatDate(conversation.updatedAt, currentLocale)}
                                     </td>
                                     <td>
                                         <span className={conversation.isVisible
                                             ? 'admin-md3__chip admin-md3__chip--success'
                                             : 'admin-md3__chip admin-md3__chip--neutral'}
                                         >
-                                            {conversation.isVisible ? '可见' : '已隐藏'}
+                                            {conversation.isVisible
+                                                ? t('admin.conversations.visible')
+                                                : t('admin.conversations.hidden')}
                                         </span>
                                     </td>
                                     <td>
@@ -999,7 +1004,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                         !conversation.isVisible
                                                     )
                                                 }
-                                                title={conversation.isVisible ? '隐藏' : '恢复'}
+                                                title={conversation.isVisible
+                                                    ? t('admin.conversations.hide')
+                                                    : t('admin.conversations.restore')}
                                             >
                                                 {conversation.isVisible
                                                     ? <Cancel01Icon size={16} />
@@ -1008,7 +1015,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                             <md-icon-button
                                                 type="button"
                                                 onClick={() => handleDeleteConversation(conversation)}
-                                                title="删除"
+                                                title={t('deleteConversation')}
                                             >
                                                 <Delete02Icon size={16} />
                                             </md-icon-button>
@@ -1031,12 +1038,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     className="admin-md3__pane p-5"
                 >
                     <h3 className="text-base font-semibold">
-                        模型配置
+                        {t('admin.model.title')}
                     </h3>
                     <div className="mt-5 grid gap-4 sm:grid-cols-2">
                         <md-outlined-select
                             className="admin-md3__field"
-                            label="模型供应商"
+                            label={t('admin.model.provider')}
                             value={modelDraft.provider}
                             menuPositioning="fixed"
                             onInput={(event) =>
@@ -1055,10 +1062,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         </md-outlined-select>
                         <md-outlined-text-field
                             className="admin-md3__field"
-                            label="模型名称"
+                            label={t('admin.model.name')}
                             value={modelDraft.modelName}
                             supportingText={selectedProvider?.models.length
-                                ? `可用：${selectedProvider.models.slice(0, 3).join(', ')}`
+                                ? t('admin.model.available', {
+                                    models: selectedProvider.models.slice(0, 3).join(', '),
+                                })
                                 : ''}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
@@ -1098,8 +1107,8 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             label="API Key"
                             value={modelDraft.apiKey}
                             supportingText={modelConfig?.hasApiKey
-                                ? `已保存 ${modelConfig.apiKeyMask}`
-                                : '请输入 API Key'}
+                                ? t('savedApiKey', { mask: modelConfig.apiKeyMask })
+                                : t('admin.model.apiKeyPlaceholder')}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
                                 setModelDraft((prev) => ({
@@ -1117,29 +1126,29 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <span slot="icon" className="admin-md3__slot-icon">
                             <Tick02Icon size={16} />
                         </span>
-                        保存配置
+                        {t('admin.config.save')}
                     </md-filled-button>
                 </form>
 
                 <div className="admin-md3__pane p-5">
                     <h3 className="text-base font-semibold">
-                        当前生效
+                        {t('admin.config.current')}
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="admin-md3__muted">供应商</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.provider')}</dt>
                             <dd className="mt-1 font-medium">
                                 {modelConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">模型</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.model')}</dt>
                             <dd className="mt-1 font-medium">
                                 {modelConfig?.modelName ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">接口</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.endpoint')}</dt>
                             <dd className="mt-1 break-all font-medium">
                                 {modelConfig
                                     ? `${modelConfig.baseUrl}${modelConfig.apiPath}`
@@ -1152,7 +1161,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
                                 : 'mt-1 font-medium text-[var(--md-sys-color-error)]'}
                             >
-                                {modelConfig?.hasApiKey ? modelConfig.apiKeyMask : '未配置'}
+                                {modelConfig?.hasApiKey ? modelConfig.apiKeyMask : t('notConfigured')}
                             </dd>
                         </div>
                     </dl>
@@ -1169,7 +1178,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     className="admin-md3__pane p-5"
                 >
                     <h3 className="text-base font-semibold">
-                        联网搜索
+                        {t('admin.webSearch.title')}
                     </h3>
                     <div className="mt-5 space-y-4">
                         <md-outlined-text-field
@@ -1178,8 +1187,8 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             label="Tavily API Key"
                             value={webSearchDraft.apiKey}
                             supportingText={webSearchConfig?.hasApiKey
-                                ? `已保存 ${webSearchConfig.apiKeyMask}`
-                                : '请输入 Tavily API Key'}
+                                ? t('savedApiKey', { mask: webSearchConfig.apiKeyMask })
+                                : t('admin.webSearch.apiKeyPlaceholder')}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
                                 setWebSearchDraft((prev) => ({
@@ -1199,7 +1208,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     }));
                                 }}
                             />
-                            <span>启用联网搜索</span>
+                            <span>{t('admin.webSearch.enable')}</span>
                         </label>
                     </div>
                     <md-filled-button
@@ -1210,28 +1219,28 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <span slot="icon" className="admin-md3__slot-icon">
                             <Tick02Icon size={16} />
                         </span>
-                        保存配置
+                        {t('admin.config.save')}
                     </md-filled-button>
                 </form>
 
                 <div className="admin-md3__pane p-5">
                     <h3 className="text-base font-semibold">
-                        当前生效
+                        {t('admin.config.current')}
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="admin-md3__muted">供应商</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.provider')}</dt>
                             <dd className="mt-1 font-medium">
                                 {webSearchConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">状态</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.status')}</dt>
                             <dd className={webSearchConfig?.isEnabled
                                 ? 'mt-1 font-medium text-emerald-600 dark:text-emerald-300'
                                 : 'admin-md3__muted mt-1 font-medium'}
                             >
-                                {webSearchConfig?.isEnabled ? '启用' : '停用'}
+                                {webSearchConfig?.isEnabled ? t('enabled') : t('disabled')}
                             </dd>
                         </div>
                         <div>
@@ -1242,13 +1251,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             >
                                 {webSearchConfig?.hasApiKey
                                     ? webSearchConfig.apiKeyMask
-                                    : '未配置'}
+                                    : t('notConfigured')}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">更新时间</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.updatedAt')}</dt>
                             <dd className="mt-1 font-medium">
-                                {formatDate(webSearchConfig?.updatedAt ?? null)}
+                                {formatDate(webSearchConfig?.updatedAt ?? null, currentLocale)}
                             </dd>
                         </div>
                     </dl>
@@ -1265,21 +1274,20 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     className="admin-md3__pane p-5"
                 >
                     <h3 className="text-base font-semibold">
-                        百度 PaddleOCR
+                        {t('admin.ocr.title')}
                     </h3>
                     <p className="admin-md3__muted mt-2 text-sm leading-6">
-                        用于 PNG、JPG、JPEG 和图片型 PDF 的异步识别。这里填写的是百度 AI Studio
-                        访问令牌（Access Token），界面按 API Key 管理。
+                        {t('admin.ocr.description')}
                     </p>
                     <div className="mt-5 space-y-4">
                         <md-outlined-text-field
                             className="admin-md3__field"
                             type="password"
-                            label="百度 API Key / Access Token"
+                            label={t('admin.ocr.apiKey')}
                             value={paddleOcrDraft.apiKey}
                             supportingText={paddleOcrConfig?.hasApiKey
-                                ? `已保存 ${paddleOcrConfig.apiKeyMask}`
-                                : '请输入 AI Studio Access Token'}
+                                ? t('savedApiKey', { mask: paddleOcrConfig.apiKeyMask })
+                                : t('admin.ocr.apiKeyPlaceholder')}
                             onInput={(event) => {
                                 const value = getMaterialValue(event);
                                 setPaddleOcrDraft({
@@ -1296,23 +1304,23 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         <span slot="icon" className="admin-md3__slot-icon">
                             <Tick02Icon size={16} />
                         </span>
-                        保存配置
+                        {t('admin.config.save')}
                     </md-filled-button>
                 </form>
 
                 <div className="admin-md3__pane p-5">
                     <h3 className="text-base font-semibold">
-                        当前生效
+                        {t('admin.config.current')}
                     </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="admin-md3__muted">供应商</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.provider')}</dt>
                             <dd className="mt-1 font-medium">
                                 {paddleOcrConfig?.providerLabel ?? '-'}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">模型</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.model')}</dt>
                             <dd className="mt-1 font-medium">
                                 {paddleOcrConfig?.modelName ?? '-'}
                             </dd>
@@ -1325,13 +1333,13 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             >
                                 {paddleOcrConfig?.hasApiKey
                                     ? paddleOcrConfig.apiKeyMask
-                                    : '未配置'}
+                                    : t('notConfigured')}
                             </dd>
                         </div>
                         <div>
-                            <dt className="admin-md3__muted">更新时间</dt>
+                            <dt className="admin-md3__muted">{t('admin.fields.updatedAt')}</dt>
                             <dd className="mt-1 font-medium">
-                                {formatDate(paddleOcrConfig?.updatedAt ?? null)}
+                                {formatDate(paddleOcrConfig?.updatedAt ?? null, currentLocale)}
                             </dd>
                         </div>
                     </dl>
@@ -1346,9 +1354,9 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         }
 
         const ragStats = [
-            { label: '知识文件', value: ragStatus.totalFiles },
-            { label: '已入库文件', value: ragStatus.indexedFiles },
-            { label: '向量数量', value: ragStatus.vectorCount },
+            { label: t('admin.rag.totalFiles'), value: ragStatus.totalFiles },
+            { label: t('admin.rag.indexedFiles'), value: ragStatus.indexedFiles },
+            { label: t('admin.rag.vectorCount'), value: ragStatus.vectorCount },
         ];
         const uploadAccept = ragStatus.allowedFileTypes
             .map((fileType) => fileType.startsWith('.') ? fileType : `.${fileType}`)
@@ -1366,7 +1374,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                 {stat.label}
                             </div>
                             <div className="mt-2 text-3xl font-semibold">
-                                {formatCount(stat.value)}
+                                {formatCount(stat.value, currentLocale)}
                             </div>
                         </div>
                     ))}
@@ -1376,7 +1384,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                     <div className="admin-md3__pane min-w-0 overflow-hidden">
                         <div className="flex flex-col gap-3 border-b border-[var(--md-sys-color-outline-variant)] p-4 lg:flex-row lg:items-center lg:justify-between">
                             <h3 className="text-base font-semibold">
-                                知识文件
+                                {t('admin.rag.knowledgeFiles')}
                             </h3>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <input
@@ -1395,7 +1403,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     <span slot="icon" className="admin-md3__slot-icon">
                                         <Add01Icon size={16} />
                                     </span>
-                                    上传
+                                    {t('admin.rag.upload')}
                                 </md-filled-button>
                             </div>
                             {ragUploadFiles.length > 0 && (
@@ -1423,12 +1431,12 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             <table className="admin-md3__table min-w-[780px]">
                                 <thead>
                                     <tr>
-                                        <th>文件</th>
-                                        <th>大小</th>
-                                        <th>分片</th>
-                                        <th>更新时间</th>
-                                        <th>状态</th>
-                                        <th className="text-right">操作</th>
+                                        <th>{t('admin.fields.file')}</th>
+                                        <th>{t('admin.fields.size')}</th>
+                                        <th>{t('admin.fields.chunks')}</th>
+                                        <th>{t('admin.fields.updatedAt')}</th>
+                                        <th>{t('admin.fields.status')}</th>
+                                        <th className="text-right">{t('admin.fields.actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1438,7 +1446,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                 colSpan={6}
                                                 className="admin-md3__muted py-10 text-center"
                                             >
-                                                暂无知识文件
+                                                {t('admin.rag.empty')}
                                             </td>
                                         </tr>
                                     ) : ragStatus.files.map((file) => (
@@ -1475,11 +1483,11 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                 {file.chunkCount}
                                             </td>
                                             <td className="admin-md3__muted">
-                                                {formatDate(file.modifiedAt)}
+                                                {formatDate(file.modifiedAt, currentLocale)}
                                             </td>
                                             <td>
                                                 <span className={ragFileStatusBadgeClass(file.status, file.indexed)}>
-                                                    {ragFileStatusLabel(file.status, file.indexed)}
+                                                    {t(ragFileStatusTranslationKey(file.status, file.indexed))}
                                                 </span>
                                             </td>
                                             <td>
@@ -1488,7 +1496,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                                         type="button"
                                                         onClick={() => void handleRagDelete(file.id, file.name)}
                                                         disabled={saving}
-                                                        title="删除"
+                                                        title={t('deleteConversation')}
                                                     >
                                                         <Delete02Icon size={16} />
                                                     </md-icon-button>
@@ -1503,29 +1511,29 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
 
                     <div className="admin-md3__pane p-5">
                         <h3 className="text-base font-semibold">
-                            向量库
+                            {t('admin.rag.vectorDatabase')}
                         </h3>
                         <dl className="mt-4 space-y-3 text-sm">
                             <div>
-                                <dt className="admin-md3__muted">Collection</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.collection')}</dt>
                                 <dd className="mt-1 break-all font-medium">
                                     {ragStatus.collectionName}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="admin-md3__muted">文件目录</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.dataPath')}</dt>
                                 <dd className="mt-1 break-all font-medium">
                                     {ragStatus.dataPath}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="admin-md3__muted">数据库目录</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.persistDirectory')}</dt>
                                 <dd className="mt-1 break-all font-medium">
                                     {ragStatus.persistDirectory}
                                 </dd>
                             </div>
                             <div>
-                                <dt className="admin-md3__muted">文件类型</dt>
+                                <dt className="admin-md3__muted">{t('admin.fields.fileTypes')}</dt>
                                 <dd className="mt-1 font-medium">
                                     {ragStatus.allowedFileTypes.join(', ')}
                                 </dd>
@@ -1540,7 +1548,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             <span slot="icon" className="admin-md3__slot-icon">
                                 <Refresh01Icon size={16} className={saving ? 'animate-spin' : ''} />
                             </span>
-                            生成数据库
+                            {t('admin.rag.rebuild')}
                         </md-filled-button>
                     </div>
                 </div>
@@ -1553,7 +1561,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             return (
                 <div className="admin-md3__muted flex min-h-[320px] items-center justify-center gap-3">
                     <md-circular-progress indeterminate></md-circular-progress>
-                    <span>加载中</span>
+                    <span>{t('loading')}</span>
                 </div>
             );
         }
@@ -1590,24 +1598,24 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="admin-md3__top-app-bar flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                 <div>
                     <h2 className="text-2xl font-semibold">
-                        Admin 管理中心
+                        {t('admin.title')}
                     </h2>
                     <p className="admin-md3__muted mt-1 text-sm">
-                        数据、用户、对话、模型、联网搜索、OCR 和 RAG 配置
+                        {t('admin.subtitle')}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <md-icon-button
                         type="button"
                         onClick={() => void refreshAll()}
-                        title="刷新"
+                        title={t('refresh')}
                     >
                         <Refresh01Icon size={18} />
                     </md-icon-button>
                     <md-icon-button
                         type="button"
                         onClick={onClose}
-                        title="关闭"
+                        title={t('close')}
                     >
                         <Cancel01Icon size={18} />
                     </md-icon-button>

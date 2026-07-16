@@ -204,7 +204,7 @@ export default function SettingsPage({
     };
 
     const handleDeleteMemory = async (memory: UserMemory) => {
-        if (!window.confirm('确定删除这条记忆？')) {
+        if (!window.confirm(t('settingsPage.memories.deleteConfirm'))) {
             return;
         }
 
@@ -324,7 +324,7 @@ export default function SettingsPage({
                                         >
                                             <img
                                                 src={bg}
-                                                alt="Background"
+                                                alt={t('backgroundPreview')}
                                             />
                                         </button>
                                     ))}
@@ -351,7 +351,7 @@ export default function SettingsPage({
                                         >
                                             <img
                                                 src={bg}
-                                                alt="Background"
+                                                alt={t('backgroundPreview')}
                                             />
                                         </button>
                                     ))}
@@ -363,12 +363,12 @@ export default function SettingsPage({
                     <section className="settings-md3__pane p-5">
                         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h3 className="text-lg font-semibold">
-                                记忆
+                                {t('settingsPage.memories.title')}
                             </h3>
                             <md-outlined-text-field
                                 className="settings-md3__field sm:max-w-xs"
                                 type="search"
-                                label="搜索记忆"
+                                label={t('settingsPage.memories.search')}
                                 value={memorySearch}
                                 onInput={(event) => setMemorySearch(getMaterialValue(event))}
                             >
@@ -382,7 +382,7 @@ export default function SettingsPage({
                             <md-outlined-text-field
                                 className="settings-md3__field"
                                 type="textarea"
-                                label="写入一条长期记忆"
+                                label={t('settingsPage.memories.draft')}
                                 value={memoryDraft}
                                 maxLength={4000}
                                 rows={4}
@@ -390,7 +390,9 @@ export default function SettingsPage({
                             />
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="settings-md3__muted text-sm">
-                                    {editingMemoryId ? '正在编辑' : `${memories.length} 条记忆`}
+                                    {editingMemoryId
+                                        ? t('settingsPage.memories.editing')
+                                        : t('settingsPage.memories.count', { count: memories.length })}
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {editingMemoryId && (
@@ -401,7 +403,7 @@ export default function SettingsPage({
                                             <span slot="icon" className="settings-md3__slot-icon">
                                                 <Cancel01Icon size={16} />
                                             </span>
-                                            取消
+                                            {t('settingsPage.memories.cancel')}
                                         </md-outlined-button>
                                     )}
                                     <md-filled-button
@@ -417,7 +419,11 @@ export default function SettingsPage({
                                                 <Add01Icon size={16} />
                                             </span>
                                         )}
-                                        {memorySaving ? '保存中' : editingMemoryId ? '保存' : '添加'}
+                                        {memorySaving
+                                            ? t('settingsPage.memories.saving')
+                                            : editingMemoryId
+                                                ? t('save')
+                                                : t('settingsPage.memories.add')}
                                     </md-filled-button>
                                 </div>
                             </div>
@@ -432,11 +438,11 @@ export default function SettingsPage({
                         <div className="mt-4 space-y-3">
                             {memoryLoading ? (
                                 <div className="settings-md3__pane-high px-4 py-6 text-center text-sm">
-                                    正在加载
+                                    {t('settingsPage.memories.loading')}
                                 </div>
                             ) : filteredMemories.length === 0 ? (
                                 <div className="settings-md3__pane-high px-4 py-6 text-center text-sm">
-                                    暂无记忆
+                                    {t('settingsPage.memories.empty')}
                                 </div>
                             ) : (
                                 filteredMemories.map((memory) => (
@@ -457,14 +463,14 @@ export default function SettingsPage({
                                                 <md-icon-button
                                                     type="button"
                                                     onClick={() => handleEditMemory(memory)}
-                                                    title="编辑"
+                                                    title={t('settingsPage.memories.edit')}
                                                 >
                                                     <Edit01Icon size={16} />
                                                 </md-icon-button>
                                                 <md-icon-button
                                                     type="button"
                                                     onClick={() => void handleDeleteMemory(memory)}
-                                                    title="删除"
+                                                    title={t('settingsPage.memories.delete')}
                                                 >
                                                     <Delete02Icon size={16} />
                                                 </md-icon-button>
