@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import '@material/web/button/filled-button.js';
 import '@material/web/iconbutton/icon-button.js';
@@ -274,16 +274,16 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const handleError = (error: unknown) => {
+    const handleError = useCallback((error: unknown) => {
         if (error instanceof ApiAuthError) {
             onAuthExpired();
             return;
         }
 
         setErrorMessage(error instanceof Error ? error.message : String(error));
-    };
+    }, [onAuthExpired]);
 
-    const refreshAll = async () => {
+    const refreshAll = useCallback(async () => {
         setLoading(true);
         setErrorMessage(null);
         try {
@@ -322,11 +322,15 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
         } finally {
             setLoading(false);
         }
-    };
+    }, [handleError]);
 
     useEffect(() => {
-        void refreshAll();
-    }, []);
+        const timer = window.setTimeout(() => {
+            void refreshAll();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [refreshAll]);
 
     useEffect(() => {
         const hasActiveRagTask = ragStatus?.files.some((file) => {

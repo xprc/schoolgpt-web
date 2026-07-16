@@ -209,12 +209,15 @@ export default function MainChat({
             return;
         }
 
-        setNowMs(Date.now());
+        const firstTickId = window.setTimeout(() => {
+            setNowMs(Date.now());
+        }, 0);
         const timerId = window.setInterval(() => {
             setNowMs(Date.now());
         }, 1000);
 
         return () => {
+            window.clearTimeout(firstTickId);
             window.clearInterval(timerId);
         };
     }, [isLoading]);
@@ -361,7 +364,7 @@ export default function MainChat({
             ragSources: [],
             reasoningContent: '',
             reasoningDurationMs: null,
-            reasoningStartedAt: Date.now(),
+            reasoningStartedAt: Date.parse(responseCreatedAt),
             createdAt: responseCreatedAt,
             updatedAt: responseCreatedAt,
         };

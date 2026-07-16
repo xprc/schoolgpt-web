@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Document, Page, pdfjs } from 'react-pdf';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -126,7 +126,7 @@ export default function RagFileBrowser({
         return { data: pdfData };
     }, [pdfData]);
 
-    const queueScrollToPage = (nextPageNumber: number, nextPageCount = pageCount) => {
+    const queueScrollToPage = useCallback((nextPageNumber: number, nextPageCount = pageCount) => {
         if (nextPageCount <= 0) {
             return;
         }
@@ -138,7 +138,7 @@ export default function RagFileBrowser({
             page: safePageNumber,
             nonce: scrollTargetNonceRef.current,
         });
-    };
+    }, [pageCount]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -146,82 +146,88 @@ export default function RagFileBrowser({
         }
 
         let cancelled = false;
-        setLoadingList(true);
-        setErrorMessage('');
+        const timerId = window.setTimeout(() => {
+            setLoadingList(true);
+            setErrorMessage('');
 
-        fetchRagFiles()
-            .then((nextFiles) => {
-                if (cancelled) {
-                    return;
-                }
+            fetchRagFiles()
+                .then((nextFiles) => {
+                    if (cancelled) {
+                        return;
+                    }
 
-                setFiles(nextFiles);
-                const requestedFile = openRequest?.fileId
-                    ? nextFiles.find((file) => file.id === openRequest.fileId)
-                    : null;
-                setSelectedFileId(requestedFile?.id ?? nextFiles[0]?.id ?? null);
-            })
-            .catch((error: unknown) => {
-                if (cancelled) {
-                    return;
-                }
+                    setFiles(nextFiles);
+                    const requestedFile = openRequest?.fileId
+                        ? nextFiles.find((file) => file.id === openRequest.fileId)
+                        : null;
+                    setSelectedFileId(requestedFile?.id ?? nextFiles[0]?.id ?? null);
+                })
+                .catch((error: unknown) => {
+                    if (cancelled) {
+                        return;
+                    }
 
-                if (error instanceof ApiAuthError) {
-                    onAuthExpired();
-                    return;
-                }
+                    if (error instanceof ApiAuthError) {
+                        onAuthExpired();
+                        return;
+                    }
 
-                setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingListFailed'));
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoadingList(false);
-                }
-            });
+                    setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingListFailed'));
+                })
+                .finally(() => {
+                    if (!cancelled) {
+                        setLoadingList(false);
+                    }
+                });
+        }, 0);
 
         return () => {
             cancelled = true;
+            window.clearTimeout(timerId);
         };
     }, [isOpen, onAuthExpired, openRequest, t]);
 
     useEffect(() => {
-        if (!isOpen || selectedFileId === null) {
-            setDetail(null);
-            return;
-        }
-
         let cancelled = false;
-        const chunkIndex =
-            openRequest?.fileId === selectedFileId ? openRequest.chunkIndex ?? null : null;
-        setLoadingDetail(true);
-        setErrorMessage('');
+        const timerId = window.setTimeout(() => {
+            if (!isOpen || selectedFileId === null) {
+                setDetail(null);
+                return;
+            }
 
-        fetchRagFile(selectedFileId, chunkIndex)
-            .then((nextDetail) => {
-                if (!cancelled) {
-                    setDetail(nextDetail);
-                }
-            })
-            .catch((error: unknown) => {
-                if (cancelled) {
-                    return;
-                }
+            const chunkIndex =
+                openRequest?.fileId === selectedFileId ? openRequest.chunkIndex ?? null : null;
+            setLoadingDetail(true);
+            setErrorMessage('');
 
-                if (error instanceof ApiAuthError) {
-                    onAuthExpired();
-                    return;
-                }
+            fetchRagFile(selectedFileId, chunkIndex)
+                .then((nextDetail) => {
+                    if (!cancelled) {
+                        setDetail(nextDetail);
+                    }
+                })
+                .catch((error: unknown) => {
+                    if (cancelled) {
+                        return;
+                    }
 
-                setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingFileFailed'));
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoadingDetail(false);
-                }
-            });
+                    if (error instanceof ApiAuthError) {
+                        onAuthExpired();
+                        return;
+                    }
+
+                    setErrorMessage(error instanceof Error ? error.message : t('ragFiles.loadingFileFailed'));
+                })
+                .finally(() => {
+                    if (!cancelled) {
+                        setLoadingDetail(false);
+                    }
+                });
+        }, 0);
 
         return () => {
             cancelled = true;
+            window.clearTimeout(timerId);
         };
     }, [isOpen, onAuthExpired, openRequest, selectedFileId, t]);
 
@@ -262,55 +268,57 @@ export default function RagFileBrowser({
 
     useEffect(() => {
         let cancelled = false;
+        const timerId = window.setTimeout(() => {
+            setPdfData(null);
+            setPageCount(0);
+            setPageNumber(1);
+            setScrollTarget(null);
+            setPreviewError('');
 
-        setPdfData(null);
-        setPageCount(0);
-        setPageNumber(1);
-        setScrollTarget(null);
-        setPreviewError('');
+            if (!isOpen || detailId === null || detailStatus === 'failed') {
+                setLoadingPreview(false);
+                return;
+            }
 
-        if (!isOpen || detailId === null || detailStatus === 'failed') {
-            setLoadingPreview(false);
-            return undefined;
-        }
+            setLoadingPreview(true);
 
-        setLoadingPreview(true);
+            fetchRagFilePreview(detailId)
+                .then((blob) => {
+                    if (cancelled) {
+                        return null;
+                    }
 
-        fetchRagFilePreview(detailId)
-            .then((blob) => {
-                if (cancelled) {
-                    return null;
-                }
+                    return blob.arrayBuffer();
+                })
+                .then((arrayBuffer) => {
+                    if (cancelled || !arrayBuffer) {
+                        return;
+                    }
 
-                return blob.arrayBuffer();
-            })
-            .then((arrayBuffer) => {
-                if (cancelled || !arrayBuffer) {
-                    return;
-                }
+                    setPdfData(new Uint8Array(arrayBuffer));
+                })
+                .catch((error: unknown) => {
+                    if (cancelled) {
+                        return;
+                    }
 
-                setPdfData(new Uint8Array(arrayBuffer));
-            })
-            .catch((error: unknown) => {
-                if (cancelled) {
-                    return;
-                }
+                    if (error instanceof ApiAuthError) {
+                        onAuthExpired();
+                        return;
+                    }
 
-                if (error instanceof ApiAuthError) {
-                    onAuthExpired();
-                    return;
-                }
-
-                setPreviewError(error instanceof Error ? error.message : t('ragFiles.previewLoadFailed'));
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoadingPreview(false);
-                }
-            });
+                    setPreviewError(error instanceof Error ? error.message : t('ragFiles.previewLoadFailed'));
+                })
+                .finally(() => {
+                    if (!cancelled) {
+                        setLoadingPreview(false);
+                    }
+                });
+        }, 0);
 
         return () => {
             cancelled = true;
+            window.clearTimeout(timerId);
         };
     }, [detailId, detailStatus, isOpen, onAuthExpired, t]);
 
@@ -380,8 +388,14 @@ export default function RagFileBrowser({
             return;
         }
 
-        queueScrollToPage(targetPageNumber, pageCount);
-    }, [pageCount, targetPageNumber, openRequest?.nonce]);
+        const timerId = window.setTimeout(() => {
+            queueScrollToPage(targetPageNumber, pageCount);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [pageCount, queueScrollToPage, targetPageNumber, openRequest?.nonce]);
 
     useEffect(() => {
         if (!scrollTarget || pageCount <= 0) {

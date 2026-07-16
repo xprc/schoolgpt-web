@@ -230,10 +230,17 @@ export default function App() {
     const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
     const [renameDraft, setRenameDraft] = useState('');
     const clientCreatedConversationIdsRef = useRef(new Set<string>());
-    const [avatarUrl, setAvatarUrl] = useState(() => getGravatarFallbackAvatarUrl(''));
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
     const [ragFileOpenRequest, setRagFileOpenRequest] = useState<RagFileOpenRequest | null>(null);
+    const avatarUrl = useMemo(() => {
+        if (!session) {
+            return getGravatarFallbackAvatarUrl('');
+        }
+
+        const avatarName = session.user.displayName || session.user.username;
+        return getGravatarAvatarUrl(session.user.avatarSha256, avatarName);
+    }, [session]);
 
     useEffect(() => {
         if (session?.user.preferredLanguage) {
@@ -402,7 +409,13 @@ export default function App() {
     }, [handleLogout, session, setupState]);
 
     useEffect(() => {
-        void refreshConversationList();
+        const timerId = window.setTimeout(() => {
+            void refreshConversationList();
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
     }, [refreshConversationList]);
 
     useEffect(() => {
@@ -416,68 +429,61 @@ export default function App() {
     }, [searchQuery]);
 
     useEffect(() => {
-        const query = debouncedSearchQuery.trim();
-        if (!query) {
-            setConversationSearchResults(null);
-            setConversationSearchError(null);
-            setIsConversationSearchLoading(false);
-            return;
-        }
-
-        if (setupState !== 'ready' || !session) {
-            setConversationSearchResults(null);
-            setIsConversationSearchLoading(false);
-            return;
-        }
-
         let cancelled = false;
-        setIsConversationSearchLoading(true);
-        setConversationSearchError(null);
-
-        const searchConversations = async () => {
-            try {
-                const remoteSummaries = await fetchRemoteConversationList(query);
-                const visibleRemoteSummaries = sortConversationSummaries(
-                    remoteSummaries.filter((summary) => summary.isVisible !== false)
-                );
-
-                if (!cancelled) {
-                    setConversationSearchResults(visibleRemoteSummaries);
-                }
-            } catch (error: unknown) {
-                if (error instanceof ApiAuthError) {
-                    handleLogout();
-                    return;
-                }
-
-                if (!cancelled) {
-                    const message = error instanceof Error ? error.message : String(error);
-                    setConversationSearchError(message);
-                    setConversationSearchResults([]);
-                }
-            } finally {
-                if (!cancelled) {
-                    setIsConversationSearchLoading(false);
-                }
+        const timerId = window.setTimeout(() => {
+            const query = debouncedSearchQuery.trim();
+            if (!query) {
+                setConversationSearchResults(null);
+                setConversationSearchError(null);
+                setIsConversationSearchLoading(false);
+                return;
             }
-        };
 
-        void searchConversations();
+            if (setupState !== 'ready' || !session) {
+                setConversationSearchResults(null);
+                setIsConversationSearchLoading(false);
+                return;
+            }
+
+            setIsConversationSearchLoading(true);
+            setConversationSearchError(null);
+
+            const searchConversations = async () => {
+                try {
+                    const remoteSummaries = await fetchRemoteConversationList(query);
+                    const visibleRemoteSummaries = sortConversationSummaries(
+                        remoteSummaries.filter((summary) => summary.isVisible !== false)
+                    );
+
+                    if (!cancelled) {
+                        setConversationSearchResults(visibleRemoteSummaries);
+                    }
+                } catch (error: unknown) {
+                    if (error instanceof ApiAuthError) {
+                        handleLogout();
+                        return;
+                    }
+
+                    if (!cancelled) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        setConversationSearchError(message);
+                        setConversationSearchResults([]);
+                    }
+                } finally {
+                    if (!cancelled) {
+                        setIsConversationSearchLoading(false);
+                    }
+                }
+            };
+
+            void searchConversations();
+        }, 0);
 
         return () => {
             cancelled = true;
+            window.clearTimeout(timerId);
         };
     }, [debouncedSearchQuery, handleLogout, session, setupState]);
-
-    useEffect(() => {
-        if (!session) {
-            setAvatarUrl(getGravatarFallbackAvatarUrl(''));
-            return;
-        }
-
-        const avatarName = session.user.displayName || session.user.username;
-        setAvatarUrl(getGravatarAvatarUrl(session.user.avatarSha256, avatarName));
-    }, [session]);
 
     const handleNewChat = useCallback(() => {
         if (!session) return;
@@ -500,9 +506,15 @@ export default function App() {
     }, [conversationId, navigate]);
 
     useEffect(() => {
-        setOpenConversationMenuId(null);
-        setRenamingConversationId(null);
-        setIsSharePanelOpen(false);
+        const timerId = window.setTimeout(() => {
+            setOpenConversationMenuId(null);
+            setRenamingConversationId(null);
+            setIsSharePanelOpen(false);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
     }, [location.pathname]);
 
     useEffect(() => {
@@ -523,11 +535,17 @@ export default function App() {
             return;
         }
 
-        setCurrentConversation((prev) =>
-            prev && prev.id === draftConversationId
-                ? prev
-                : createEmptyConversation(draftConversationId, session.user.id)
-        );
+        const timerId = window.setTimeout(() => {
+            setCurrentConversation((prev) =>
+                prev && prev.id === draftConversationId
+                    ? prev
+                    : createEmptyConversation(draftConversationId, session.user.id)
+            );
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
     }, [isDraftRoute, routeConversationId, session, setupState]);
 
     useEffect(() => {

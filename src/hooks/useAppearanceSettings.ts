@@ -41,14 +41,28 @@ export const useAppearanceSettings = (
     const [resolvedDark, setResolvedDark] = useState(false);
 
     useEffect(() => {
-        if (preferences?.lightBackground) {
-            setLightBg(normalizeBackground(preferences.lightBackground, LIGHT_BG[0]));
+        const lightBackground = preferences?.lightBackground;
+        if (lightBackground) {
+            const timerId = window.setTimeout(() => {
+                setLightBg(normalizeBackground(lightBackground, LIGHT_BG[0]));
+            }, 0);
+
+            return () => {
+                window.clearTimeout(timerId);
+            };
         }
     }, [preferences?.lightBackground]);
 
     useEffect(() => {
-        if (preferences?.darkBackground) {
-            setDarkBg(normalizeBackground(preferences.darkBackground, DARK_BG[0]));
+        const darkBackground = preferences?.darkBackground;
+        if (darkBackground) {
+            const timerId = window.setTimeout(() => {
+                setDarkBg(normalizeBackground(darkBackground, DARK_BG[0]));
+            }, 0);
+
+            return () => {
+                window.clearTimeout(timerId);
+            };
         }
     }, [preferences?.darkBackground]);
 
