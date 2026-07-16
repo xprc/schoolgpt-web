@@ -1,6 +1,6 @@
-import { apiBaseUrl } from './apiConfig';
-import { getAccessToken } from './auth';
-import { ApiAuthError } from './apiChat';
+import { apiBaseUrl } from './config';
+import { getAccessToken } from '../utils/authSession';
+import { ApiAuthError } from './chat';
 import type {
     Conversation,
     ConversationShareScope,

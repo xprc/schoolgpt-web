@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { login, type AuthSession } from '../utils/auth';
+import { login } from '../api/auth';
+import type { AuthSession } from '../utils/authSession';
 
 type LoginPageProps = {
     onLogin: (session: AuthSession) => void;

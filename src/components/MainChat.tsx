@@ -17,7 +17,7 @@ import {
     VolumeUpIcon
 } from 'hugeicons-react';
 import MarkdownContent from './MarkdownContent';
-import { ApiAuthError, streamChat } from '../utils/apiChat';
+import { ApiAuthError, streamChat } from '../api/chat';
 import {
     createMessageId,
     formatConfidence,

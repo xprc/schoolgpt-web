@@ -1,7 +1,7 @@
-import { apiBaseUrl } from './apiConfig';
-import { ApiAuthError } from './apiChat';
-import { ApiRequestError } from './apiConversations';
-import { getAccessToken } from './auth';
+import { apiBaseUrl } from './config';
+import { ApiAuthError } from './chat';
+import { ApiRequestError } from './conversations';
+import { getAccessToken } from '../utils/authSession';
 
 export type UserType = 'student' | 'teacher' | 'maintenance' | 'admin';
 

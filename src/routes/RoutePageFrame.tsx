@@ -7,8 +7,8 @@ import {
     HelpCircleIcon,
     Settings01Icon,
 } from 'hugeicons-react';
-import { fetchSetupStatus } from '../utils/apiSetup';
-import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
+import { fetchSetupStatus } from '../api/setup';
+import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/authSession';
 import { getGravatarAvatarUrl, getGravatarFallbackAvatarUrl } from '../utils/gravatar';
 import { useAppearanceSettings, type AppearanceSettings } from '../hooks/useAppearanceSettings';
 

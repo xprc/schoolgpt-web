@@ -39,8 +39,8 @@ import {
     saveRemoteConversation,
     updateRemoteConversationPin,
     updateRemoteConversationShare,
-} from '../utils/apiConversations';
-import { ApiAuthError } from '../utils/apiChat';
+} from '../api/conversations';
+import { ApiAuthError } from '../api/chat';
 import {
     deleteLocalConversation,
     deleteLocalConversationsNotInRemote,
@@ -48,8 +48,8 @@ import {
     saveLocalConversation,
 } from '../utils/chatStore';
 import { getGravatarAvatarUrl, getGravatarFallbackAvatarUrl } from '../utils/gravatar';
-import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/auth';
-import { fetchSetupStatus } from '../utils/apiSetup';
+import { clearAuthSession, getStoredSession, type AuthSession } from '../utils/authSession';
+import { fetchSetupStatus } from '../api/setup';
 import { useAppearanceSettings } from '../hooks/useAppearanceSettings';
 import type {
     Conversation,

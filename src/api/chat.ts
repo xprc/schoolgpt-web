@@ -1,5 +1,5 @@
-import { apiBaseUrl } from './apiConfig';
-import { getAccessToken } from './auth';
+import { apiBaseUrl } from './config';
+import { getAccessToken } from '../utils/authSession';
 import type { Message, RagSource } from '../types';
 
 export class ApiAuthError extends Error {

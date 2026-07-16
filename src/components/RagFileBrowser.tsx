@@ -15,14 +15,14 @@ import {
     ZoomInAreaIcon,
     ZoomOutAreaIcon,
 } from 'hugeicons-react';
-import { ApiAuthError } from '../utils/apiChat';
+import { ApiAuthError } from '../api/chat';
 import {
     fetchRagFile,
     fetchRagFilePreview,
     fetchRagFiles,
     type RagFileDetail,
     type RagFileSummary,
-} from '../utils/apiRagFiles';
+} from '../api/ragFiles';
 import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;

@@ -1,4 +1,4 @@
-import { apiBaseUrl } from './apiConfig';
+import { apiBaseUrl } from './config';
 
 export type FirstRunSetupPayload = {
     database: {

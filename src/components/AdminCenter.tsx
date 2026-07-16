@@ -20,7 +20,7 @@ import {
     Search01Icon,
     Tick02Icon,
 } from 'hugeicons-react';
-import { ApiAuthError } from '../utils/apiChat';
+import { ApiAuthError } from '../api/chat';
 import {
     createAdminUser,
     deleteAdminConversation,
@@ -51,7 +51,7 @@ import {
     type RagStatus,
     type UserType,
     type WebSearchConfig,
-} from '../utils/apiAdmin';
+} from '../api/admin';
 import { renderFileTypeIcon } from '../utils/fileTypeIcons';
 import '../styles/md3-theme.css';
 import '../styles/admin-md3.css';

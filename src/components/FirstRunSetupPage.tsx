@@ -3,7 +3,7 @@ import { Refresh01Icon, Tick02Icon } from 'hugeicons-react';
 import {
     submitFirstRunSetup,
     type FirstRunSetupPayload,
-} from '../utils/apiSetup';
+} from '../api/setup';
 
 type FirstRunSetupPageProps = {
     onSetupComplete: () => void;

@@ -13,19 +13,18 @@ import {
     Tick02Icon,
 } from 'hugeicons-react';
 import { useTranslation } from 'react-i18next';
-import { ApiAuthError } from '../utils/apiChat';
+import { ApiAuthError } from '../api/chat';
 import {
     createUserMemory,
     deleteUserMemory,
     fetchUserMemories,
     updateUserMemory,
-} from '../utils/apiMemories';
+} from '../api/memories';
 import {
     AuthSessionError,
     updateCurrentUserPreferences,
-    type AuthSession,
-    type UserLanguage,
-} from '../utils/auth';
+} from '../api/auth';
+import type { AuthSession, UserLanguage } from '../utils/authSession';
 import { DARK_BG, LIGHT_BG } from '../utils/backgrounds';
 import type { UserMemory } from '../types';
 import '../styles/md3-theme.css';

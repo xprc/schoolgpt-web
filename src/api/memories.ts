@@ -1,6 +1,6 @@
-import { apiBaseUrl } from './apiConfig';
-import { ApiAuthError } from './apiChat';
-import { getAccessToken } from './auth';
+import { apiBaseUrl } from './config';
+import { ApiAuthError } from './chat';
+import { getAccessToken } from '../utils/authSession';
 import type { UserMemory } from '../types';
 
 type UserMemoryResponse = {

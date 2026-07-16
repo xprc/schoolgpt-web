@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Cancel01Icon, Logout01Icon } from 'hugeicons-react';
-import type { AuthUser } from '../utils/auth';
+import type { AuthUser } from '../utils/authSession';
 
 type ProfilePanelProps = {
     user: AuthUser;
