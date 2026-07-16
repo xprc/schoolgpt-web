@@ -1303,7 +1303,7 @@ export default function App() {
                                 navigate('/admin');
                             }}
                             title={t('admin.title')}
-                            className="p-2 hover:bg-white/10 rounded-full text-white transition-colors hidden sm:block"
+                            className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
                         >
                             <GridIcon size={20} />
                         </button>

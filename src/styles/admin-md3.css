@@ -1,6 +1,7 @@
 .admin-md3 {
     background: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
+    min-width: 0;
 }
 
 .admin-md3__top-app-bar {
@@ -8,8 +9,28 @@
     border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
+.admin-md3__top-app-bar > div:first-child {
+    min-width: 0;
+}
+
+.admin-md3__top-app-bar h2,
+.admin-md3__top-app-bar p {
+    overflow-wrap: anywhere;
+}
+
 .admin-md3__tab-bar {
     border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+}
+
+.admin-md3__tab-bar md-tabs {
+    min-width: max-content;
+}
+
+.admin-md3__tab-bar md-primary-tab {
+    white-space: nowrap;
 }
 
 .admin-md3__pane {
@@ -137,6 +158,8 @@
 .admin-md3__file-input {
     color: var(--md-sys-color-on-surface-variant);
     font-size: 0.875rem;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .admin-md3__file-input::file-selector-button {
@@ -149,4 +172,36 @@
     font-weight: 600;
     margin-right: 0.75rem;
     padding: 0.65rem 1rem;
+}
+
+@media (max-width: 767px) {
+    .admin-md3__pane,
+    .admin-md3__pane-high {
+        border-radius: 12px;
+    }
+
+    .admin-md3 md-filled-button,
+    .admin-md3 md-filled-tonal-button,
+    .admin-md3 md-outlined-button {
+        min-inline-size: 0;
+        width: 100%;
+    }
+
+    .admin-md3__tab-bar {
+        padding-bottom: 0.125rem;
+    }
+
+    .admin-md3__tab-bar md-primary-tab {
+        min-width: 5rem;
+        --md-primary-tab-container-height: 56px;
+    }
+
+    .admin-md3__file-input {
+        width: 100%;
+    }
+
+    .admin-md3__file-input::file-selector-button {
+        margin-bottom: 0.5rem;
+        max-width: 100%;
+    }
 }

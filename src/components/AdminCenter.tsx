@@ -731,7 +731,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             <div className="grid min-h-0 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
                 <form
                     onSubmit={handleUserSubmit}
-                    className="admin-md3__pane p-5"
+                    className="admin-md3__pane p-4 sm:p-5"
                 >
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-base font-semibold">
@@ -867,7 +867,59 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                             </span>
                         </md-outlined-text-field>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="divide-y divide-[var(--md-sys-color-outline-variant)] md:hidden">
+                        {filteredUsers.map((user) => (
+                            <article
+                                key={user.id}
+                                className="p-4"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h4 className="truncate text-sm font-semibold">
+                                            {user.displayName}
+                                        </h4>
+                                        <p className="admin-md3__muted mt-1 break-all text-xs">
+                                            {user.username} · {user.email}
+                                        </p>
+                                    </div>
+                                    <span className={user.isActive
+                                        ? 'admin-md3__chip admin-md3__chip--success shrink-0'
+                                        : 'admin-md3__chip admin-md3__chip--neutral shrink-0'}
+                                    >
+                                        {user.isActive ? t('enabled') : t('disabled')}
+                                    </span>
+                                </div>
+                                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <dt className="admin-md3__muted text-xs">
+                                            {t('admin.fields.type')}
+                                        </dt>
+                                        <dd className="mt-1 font-medium">
+                                            {userTypeLabels[user.userType]}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="admin-md3__muted text-xs">
+                                            {t('admin.fields.lastLogin')}
+                                        </dt>
+                                        <dd className="mt-1 font-medium">
+                                            {formatDate(user.lastLoginAt, currentLocale)}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                <div className="mt-3 flex justify-end">
+                                    <md-icon-button
+                                        type="button"
+                                        onClick={() => handleEditUser(user)}
+                                        title={t('admin.users.edit')}
+                                    >
+                                        <Edit01Icon size={16} />
+                                    </md-icon-button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <div className="hidden overflow-x-auto md:block">
                         <table className="admin-md3__table min-w-[760px]">
                             <thead>
                                 <tr>
@@ -943,7 +995,96 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                         </span>
                     </md-outlined-text-field>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="divide-y divide-[var(--md-sys-color-outline-variant)] md:hidden">
+                    {filteredConversations.map((conversation) => (
+                        <article
+                            key={conversation.id}
+                            className="p-4"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h4 className="truncate text-sm font-semibold">
+                                        {conversation.title}
+                                    </h4>
+                                    <p className="admin-md3__muted mt-1 break-all text-xs">
+                                        {conversation.id}
+                                    </p>
+                                </div>
+                                <span className={conversation.isVisible
+                                    ? 'admin-md3__chip admin-md3__chip--success shrink-0'
+                                    : 'admin-md3__chip admin-md3__chip--neutral shrink-0'}
+                                >
+                                    {conversation.isVisible
+                                        ? t('admin.conversations.visible')
+                                        : t('admin.conversations.hidden')}
+                                </span>
+                            </div>
+                            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <dt className="admin-md3__muted text-xs">
+                                        {t('admin.fields.owner')}
+                                    </dt>
+                                    <dd className="mt-1 break-all font-medium">
+                                        {conversation.ownerUsername}
+                                    </dd>
+                                    <dd className="admin-md3__muted mt-0.5 break-all text-xs">
+                                        {conversation.ownerEmail}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="admin-md3__muted text-xs">
+                                        {t('admin.fields.updatedAt')}
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {formatDate(conversation.updatedAt, currentLocale)}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="admin-md3__muted text-xs">
+                                        {t('admin.fields.sharing')}
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {conversation.shareScope}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="admin-md3__muted text-xs">
+                                        {t('admin.fields.messages')}
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {conversation.messageCount}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div className="mt-3 flex justify-end gap-1">
+                                <md-icon-button
+                                    type="button"
+                                    onClick={() =>
+                                        handleConversationVisibility(
+                                            conversation,
+                                            !conversation.isVisible
+                                        )
+                                    }
+                                    title={conversation.isVisible
+                                        ? t('admin.conversations.hide')
+                                        : t('admin.conversations.restore')}
+                                >
+                                    {conversation.isVisible
+                                        ? <Cancel01Icon size={16} />
+                                        : <Tick02Icon size={16} />}
+                                </md-icon-button>
+                                <md-icon-button
+                                    type="button"
+                                    onClick={() => handleDeleteConversation(conversation)}
+                                    title={t('deleteConversation')}
+                                >
+                                    <Delete02Icon size={16} />
+                                </md-icon-button>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                     <table className="admin-md3__table min-w-[920px]">
                         <thead>
                             <tr>
@@ -1399,6 +1540,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                     type="button"
                                     onClick={() => void handleRagUpload()}
                                     disabled={saving || ragUploadFiles.length === 0}
+                                    className="w-full sm:w-auto"
                                 >
                                     <span slot="icon" className="admin-md3__slot-icon">
                                         <Add01Icon size={16} />
@@ -1427,7 +1569,86 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                                 </div>
                             )}
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="divide-y divide-[var(--md-sys-color-outline-variant)] md:hidden">
+                            {ragStatus.files.length === 0 ? (
+                                <div className="admin-md3__muted px-4 py-10 text-center text-sm">
+                                    {t('admin.rag.empty')}
+                                </div>
+                            ) : ragStatus.files.map((file) => (
+                                <article
+                                    key={file.id}
+                                    className="p-4"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        {renderFileTypeIcon(file.name, {
+                                            className: 'mt-0.5 shrink-0',
+                                        })}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <h4 className="truncate text-sm font-semibold">
+                                                        {file.name}
+                                                    </h4>
+                                                    <p className="admin-md3__muted mt-1 text-xs">
+                                                        {file.sha256 ? file.sha256.slice(0, 12) : '-'}
+                                                    </p>
+                                                </div>
+                                                <span className={`${ragFileStatusBadgeClass(file.status, file.indexed)} shrink-0`}>
+                                                    {t(ragFileStatusTranslationKey(file.status, file.indexed))}
+                                                </span>
+                                            </div>
+                                            {file.usedOcr && (
+                                                <span className="admin-md3__chip admin-md3__chip--info mt-2 text-[11px]">
+                                                    PaddleOCR
+                                                </span>
+                                            )}
+                                            {file.errorMessage && (
+                                                <p className="mt-2 break-all text-xs text-[var(--md-sys-color-error)]">
+                                                    {file.errorMessage}
+                                                </p>
+                                            )}
+                                            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                                <div>
+                                                    <dt className="admin-md3__muted text-xs">
+                                                        {t('admin.fields.size')}
+                                                    </dt>
+                                                    <dd className="mt-1 font-medium">
+                                                        {formatFileSize(file.size)}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="admin-md3__muted text-xs">
+                                                        {t('admin.fields.chunks')}
+                                                    </dt>
+                                                    <dd className="mt-1 font-medium">
+                                                        {file.chunkCount}
+                                                    </dd>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <dt className="admin-md3__muted text-xs">
+                                                        {t('admin.fields.updatedAt')}
+                                                    </dt>
+                                                    <dd className="mt-1 font-medium">
+                                                        {formatDate(file.modifiedAt, currentLocale)}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                            <div className="mt-3 flex justify-end">
+                                                <md-icon-button
+                                                    type="button"
+                                                    onClick={() => void handleRagDelete(file.id, file.name)}
+                                                    disabled={saving}
+                                                    title={t('deleteConversation')}
+                                                >
+                                                    <Delete02Icon size={16} />
+                                                </md-icon-button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                        <div className="hidden overflow-x-auto md:block">
                             <table className="admin-md3__table min-w-[780px]">
                                 <thead>
                                     <tr>
@@ -1622,7 +1843,7 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
                 </div>
             </div>
 
-            <div className="admin-md3__tab-bar px-4 sm:px-6">
+            <div className="admin-md3__tab-bar px-3 sm:px-6">
                 <md-tabs
                     activeTabIndex={activeTabIndex}
                     onChange={handleTabsChange}
@@ -1644,17 +1865,17 @@ export default function AdminCenter({ onClose, onAuthExpired }: AdminCenterProps
             </div>
 
             {(errorMessage || statusMessage) && (
-                <div className="px-4 pt-4 sm:px-6">
+                <div className="px-3 pt-3 sm:px-6 sm:pt-4">
                     <div className={errorMessage
-                        ? 'rounded-2xl border border-[var(--md-sys-color-error)] bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)]'
-                        : 'rounded-2xl border border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-primary-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-primary-container)]'}
+                        ? 'rounded-2xl border border-[var(--md-sys-color-error)] bg-[var(--md-sys-color-error-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-error-container)] break-words'
+                        : 'rounded-2xl border border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-primary-container)] px-4 py-3 text-sm text-[var(--md-sys-color-on-primary-container)] break-words'}
                     >
                         {errorMessage ?? statusMessage}
                     </div>
                 </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-6">
                 {renderActiveTab()}
             </div>
         </div>
