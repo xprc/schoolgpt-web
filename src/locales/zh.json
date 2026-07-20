@@ -78,6 +78,11 @@
   "profile": "个人资料",
   "copy": "复制",
   "speak": "朗读",
+  "messageNavigator": {
+    "label": "消息跳转",
+    "jumpTo": "跳转到第 {{index}} 条消息：{{title}}",
+    "userFallback": "用户消息"
+  },
   "backgroundPreview": "背景预览",
   "notConfigured": "未配置",
   "configured": "已配置",

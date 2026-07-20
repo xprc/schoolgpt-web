@@ -78,6 +78,11 @@
   "profile": "Profile",
   "copy": "Copy",
   "speak": "Speak",
+  "messageNavigator": {
+    "label": "Message navigation",
+    "jumpTo": "Jump to message {{index}}: {{title}}",
+    "userFallback": "User message"
+  },
   "backgroundPreview": "Background preview",
   "notConfigured": "Not configured",
   "configured": "Configured",

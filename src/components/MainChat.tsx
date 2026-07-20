@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Add01Icon,
@@ -85,6 +85,8 @@ type ChatMode = 'auto' | 'quick' | 'thinking';
 
 const chatModes: ChatMode[] = ['auto', 'quick', 'thinking'];
 const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 80;
+const MESSAGE_NAVIGATION_THRESHOLD = 5;
+const MESSAGE_NAVIGATION_TITLE_MAX_LENGTH = 64;
 
 type RagSourceGroup = {
     key: string;
@@ -93,6 +95,23 @@ type RagSourceGroup = {
     confidence: number;
     primarySource: RagSource;
     sources: RagSource[];
+};
+
+type MessageNavigationItem = {
+    id: string;
+    index: number;
+    messageIndex: number;
+    title: string;
+    ariaLabel: string;
+};
+
+type MessageNavigatorProps = {
+    items: MessageNavigationItem[];
+    activeMessageIndex: number;
+    isOpen: boolean;
+    label: string;
+    onOpenChange: (isOpen: boolean) => void;
+    onJump: (id: string) => void;
 };
 
 const AssistantMarkdownContent = ({ content }: { content: string }) => {
@@ -183,6 +202,115 @@ const isNearScrollBottom = (element: HTMLElement): boolean => (
     element.scrollHeight - element.scrollTop - element.clientHeight <= AUTO_SCROLL_BOTTOM_THRESHOLD_PX
 );
 
+const getMessageNavigationTitle = (message: Message, fallback: string): string => {
+    const normalizedContent = message.content.trim().replace(/\s+/g, ' ');
+
+    if (!normalizedContent) {
+        return fallback;
+    }
+
+    if (normalizedContent.length <= MESSAGE_NAVIGATION_TITLE_MAX_LENGTH) {
+        return normalizedContent;
+    }
+
+    return `${normalizedContent.slice(0, MESSAGE_NAVIGATION_TITLE_MAX_LENGTH).trimEnd()}...`;
+};
+
+const MessageNavigator = ({
+    items,
+    activeMessageIndex,
+    isOpen,
+    label,
+    onOpenChange,
+    onJump,
+}: MessageNavigatorProps) => {
+    if (items.length < MESSAGE_NAVIGATION_THRESHOLD) {
+        return null;
+    }
+
+    const currentIndex = items.reduce((current, item) => (
+        item.messageIndex <= activeMessageIndex ? item.index : current
+    ), 0);
+
+    return (
+        <nav
+            aria-label={label}
+            className="fixed right-2 top-1/2 z-30 -translate-y-1/2 sm:right-5"
+            onMouseEnter={() => onOpenChange(true)}
+            onMouseLeave={() => onOpenChange(false)}
+            onFocus={() => onOpenChange(true)}
+            onBlur={(event) => {
+                const nextTarget = event.relatedTarget;
+                if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                    onOpenChange(false);
+                }
+            }}
+        >
+            <div className="relative flex items-center justify-end">
+                <div
+                    className={`absolute right-0 top-1/2 z-20 w-[min(24rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] -translate-y-1/2 overflow-hidden rounded-[20px] border border-gray-200/85 bg-white/[0.96] p-1.5 shadow-2xl shadow-black/15 backdrop-blur-xl transition-all duration-150 dark:border-white/15 dark:bg-[#151923]/[0.96] dark:shadow-black/45 ${
+                        isOpen
+                            ? 'pointer-events-auto translate-x-0 opacity-100'
+                            : 'pointer-events-none translate-x-0 opacity-0'
+                    }`}
+                >
+                    <div className="max-h-[min(52vh,28rem)] overflow-x-hidden overflow-y-auto rounded-2xl [scrollbar-gutter:stable] custom-scrollbar">
+                        {items.map((item) => {
+                            const active = item.index === currentIndex;
+
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => onJump(item.id)}
+                                    className={`block w-full min-w-0 rounded-xl px-3 py-2 text-left transition-colors ${
+                                        active
+                                            ? 'bg-gray-100/90 text-gray-950 dark:bg-white/10 dark:text-white'
+                                            : 'text-gray-700 hover:bg-gray-100/75 hover:text-gray-950 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white'
+                                    }`}
+                                    title={item.ariaLabel}
+                                    aria-label={item.ariaLabel}
+                                    aria-current={active ? 'location' : undefined}
+                                >
+                                    <span className="block truncate text-[15px] leading-6">
+                                        {item.title}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="relative z-10 flex max-h-[52vh] w-9 flex-col items-center gap-1.5 overflow-x-hidden overflow-y-auto rounded-full px-1 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {items.map((item) => {
+                        const active = item.index === currentIndex;
+
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => onJump(item.id)}
+                                className="flex h-3 w-8 shrink-0 items-center justify-center"
+                                title={item.ariaLabel}
+                                aria-label={item.ariaLabel}
+                                aria-current={active ? 'location' : undefined}
+                            >
+                                <span
+                                    className={`block rounded-full transition-all ${
+                                        active
+                                            ? 'h-[3px] w-6 bg-gray-950 dark:bg-white'
+                                            : 'h-0.5 w-5 bg-gray-400/70 hover:bg-gray-600 dark:bg-white/35 dark:hover:bg-white/70'
+                                    }`}
+                                />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </nav>
+    );
+};
+
 export default function MainChat({
     canWrite,
     messages,
@@ -199,10 +327,45 @@ export default function MainChat({
     const [isRecording, setIsRecording] = useState(false);
     const [speakingId, setSpeakingId] = useState<string | null>(null);
     const [nowMs, setNowMs] = useState(() => Date.now());
+    const [activeMessageIndex, setActiveMessageIndex] = useState(0);
+    const [isMessageNavigatorOpen, setIsMessageNavigatorOpen] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messageItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const shouldFollowScrollRef = useRef(true);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+    const messageNavigationItems = useMemo(
+        () => messages.reduce<MessageNavigationItem[]>((items, message, messageIndex) => {
+            if (message.role !== 'user') {
+                return items;
+            }
+
+            const index = items.length;
+            const fallback = t('messageNavigator.userFallback');
+            const title = getMessageNavigationTitle(message, fallback);
+
+            items.push({
+                id: message.id,
+                index,
+                messageIndex,
+                title,
+                ariaLabel: t('messageNavigator.jumpTo', { index: index + 1, title }),
+            });
+
+            return items;
+        }, []),
+        [messages, t]
+    );
+
+    const setMessageItemRef = useCallback((id: string, element: HTMLDivElement | null) => {
+        if (element) {
+            messageItemRefs.current.set(id, element);
+            return;
+        }
+
+        messageItemRefs.current.delete(id);
+    }, []);
 
     useEffect(() => {
         if (!isLoading) {
@@ -330,6 +493,55 @@ export default function MainChat({
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     };
 
+    const updateActiveMessageIndex = useCallback(() => {
+        const scrollContainer = scrollContainerRef.current;
+
+        if (!scrollContainer || messages.length === 0) {
+            setActiveMessageIndex(0);
+            return;
+        }
+
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const targetTop = containerRect.top + Math.min(scrollContainer.clientHeight * 0.35, 260);
+        let closestIndex = 0;
+        let closestDistance = Number.POSITIVE_INFINITY;
+
+        messages.forEach((message, index) => {
+            const element = messageItemRefs.current.get(message.id);
+            if (!element) {
+                return;
+            }
+
+            const rect = element.getBoundingClientRect();
+            const distance = rect.top <= targetTop && rect.bottom >= targetTop
+                ? 0
+                : Math.abs(rect.top - targetTop);
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestIndex = index;
+            }
+        });
+
+        setActiveMessageIndex((current) => current === closestIndex ? current : closestIndex);
+    }, [messages]);
+
+    const scrollToMessage = useCallback((id: string) => {
+        const targetElement = messageItemRefs.current.get(id);
+        if (!targetElement) {
+            return;
+        }
+
+        shouldFollowScrollRef.current = false;
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setIsMessageNavigatorOpen(false);
+
+        const targetIndex = messages.findIndex((message) => message.id === id);
+        if (targetIndex >= 0) {
+            setActiveMessageIndex(targetIndex);
+        }
+    }, [messages]);
+
     const updateShouldFollowScroll = () => {
         const scrollContainer = scrollContainerRef.current;
         if (!scrollContainer) {
@@ -337,6 +549,7 @@ export default function MainChat({
         }
 
         shouldFollowScrollRef.current = isNearScrollBottom(scrollContainer);
+        updateActiveMessageIndex();
     };
 
     useEffect(() => {
@@ -344,6 +557,14 @@ export default function MainChat({
             scrollToBottom();
         }
     }, [messages]);
+
+    useEffect(() => {
+        const frameId = window.requestAnimationFrame(updateActiveMessageIndex);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [updateActiveMessageIndex]);
 
     const submitMessage = async (query: string, currentMessages: Message[]) => {
         setIsLoading(true);
@@ -485,6 +706,14 @@ export default function MainChat({
             onScroll={updateShouldFollowScroll}
             className="flex-1 min-w-0 h-full bg-transparent overflow-y-auto custom-scrollbar transition-colors duration-200"
         >
+            <MessageNavigator
+                items={messageNavigationItems}
+                activeMessageIndex={activeMessageIndex}
+                isOpen={isMessageNavigatorOpen}
+                label={t('messageNavigator.label')}
+                onOpenChange={setIsMessageNavigatorOpen}
+                onJump={scrollToMessage}
+            />
             <div className="min-h-full flex flex-col">
             <div className="flex-1 px-4 sm:px-8 pt-24 sm:pt-24 pb-6 sm:pb-8 relative bg-transparent">
                 <div className="max-w-4xl mx-auto space-y-8 sm:space-y-10">
@@ -495,7 +724,11 @@ export default function MainChat({
                         </div>
                     ) : (
                         messages.map((msg, index) => (
-                            <div key={msg.id}>
+                            <div
+                                key={msg.id}
+                                ref={(element) => setMessageItemRef(msg.id, element)}
+                                className="scroll-mt-24"
+                            >
                                 {msg.role === 'user' ? (
                                     <div className="flex justify-end mb-6 min-w-0">
                                         <div
