@@ -16,7 +16,7 @@
     "hugeicons-react": "^0.4.0",
     "i18next": "^26.2.0",
     "katex": "^0.16.47",
-    "pdfjs-dist": "5.4.296",
+    "pdfjs-dist": "6.2.108",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^17.0.8",
