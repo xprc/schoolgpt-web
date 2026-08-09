@@ -11,7 +11,7 @@
     "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
-    "@material/web": "^2.4.1",
+    "@material/web": "^2.5.0",
     "@tailwindcss/vite": "^4.3.0",
     "hugeicons-react": "^0.4.0",
     "i18next": "^26.2.0",
