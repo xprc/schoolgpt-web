@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@material/web": "^2.5.0",
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "hugeicons-react": "^0.4.0",
     "i18next": "^26.2.0",
     "katex": "^0.16.47",
